@@ -141,3 +141,23 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# === Roguemouse workflow scaffolding ===
+# Explicitly allow Claude Code workflow files
+!.claude/
+!.claude/commands/
+!.claude/commands/*.md
+!.claude/rules/
+!.claude/rules/*.md
+
+# Explicitly allow task tracking
+!tasks/
+!tasks/*.md
+
+# Explicitly allow sprint docs
+!docs/
+!docs/**/*.md
+!docs/sprints/.gitkeep
+
+# Explicitly allow root context file
+!ROGUEMOUSE_CONTEXT.md

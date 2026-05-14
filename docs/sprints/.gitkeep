@@ -1,0 +1,14 @@
+# Sprints directory
+
+Each sprint's documents (brainstorm, spec, plan, review) go in a subdirectory named after the feature:
+docs/sprints/
+smoke-test-vultr-integration/
+brainstorm.md
+spec.md
+plan.md
+review.md
+audit-log-package/
+brainstorm.md
+...
+
+This file exists only to keep the directory tracked by git. Delete it if it becomes a nuisance.
