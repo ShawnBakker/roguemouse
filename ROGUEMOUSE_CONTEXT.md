@@ -2,8 +2,8 @@
 
 This file is the canonical state of the project. **Update it whenever state changes.** It is read at every session start.
 
-**Last updated**: 2026-05-14
-**Current sprint**: Pre-scaffold — workspace foundation being built
+**Last updated**: 2026-05-13
+**Current sprint**: Sprint 1 — Local workspace scaffolding (about to start)
 
 ---
 
@@ -95,10 +95,10 @@ Division of labor:
 - **LLM error handling**: Structured `{ ok, error }` envelopes; never throw
 - **Tool orchestration**: Planner code calls tools; LLMs reason over tool outputs but do not directly invoke tools
 - **Mock broker**: Deterministic fixture replay only; no live trading anywhere
+- **Sprint pacing**: Workspace scaffolding (Sprint 1) is separated from the smoke test (Sprint 2). Reason: scaffolding is mechanical and unlocks teammate's UI work; smoke test is the first real workflow exercise and benefits from full 5-stage protocol.
 
 ## Architectural decisions deferred
 
-- Coolify vs. plain Docker Compose + Caddy for deployment (decision on Day 2)
 - Specific Gemini model versions (Pro 2.5 vs 3, Flash 1.5 vs 2.5) — verify at first Gemini integration
 - UI framework decisions inside Tailwind (component library? shadcn/ui?) — defer to Day 4
 
@@ -111,18 +111,25 @@ Division of labor:
 - Serverless Inference subscription active, Ops Engineer model verified
 - VPS provisioned, SSH access confirmed
 
-### Sprint 1 — Local workspace scaffolding ⏳ In progress
-- Repo cloned, README updated and pushed
-- Pending: pnpm-workspace.yaml, root package.json, tsconfig.base.json, .env.example, .env.local, .gitattributes
-- Pending: directory skeleton (apps/web, packages/*)
-- Pending: smoke test for Vultr Inference + Object Storage integration
+### Sprint 0.5 — Claude Code workflow scaffolding ✅ Complete (2026-05-14)
+- CLAUDE.md, ROGUEMOUSE_CONTEXT.md, .claude/commands/, .claude/rules/, tasks/, docs/sprints/ created
+- 5-stage workflow protocol installed (brainstorm → spec → plan → implement → review)
+- Commit: 2102728
+- First lessons.md entry recorded (markdown-paste corruption pattern)
+
+### Sprint 1 — Local workspace scaffolding ⏳ Next
+- Compressed workflow approved (spec+plan combined, no brainstorm — no design decisions worth exploring)
+- Scope: package.json, pnpm-workspace.yaml, tsconfig.base.json, .gitattributes, .env.example, apps/web placeholder, packages/* skeletons (schemas, audit, inference, agent, tools, broker-mock, runbooks)
+- Out of scope: smoke test logic (deferred to Sprint 2)
+- Exit criteria: pnpm install succeeds, pnpm -r typecheck returns clean, apps/web Hello World renders on pnpm dev
 
 ### Sprint queue
-- Sprint 2 — Tool Schema lock + audit log package
-- Sprint 3 — First end-to-end scenario (Scenario A: Stale IV Surface)
-- Sprint 4 — Remaining scenarios (B: Phantom Duplicate, C: Composite Score Inversion)
-- Sprint 5 — Vultr VPS deploy + Coolify setup
-- Sprint 6 — Polish, demo video, submission
+- Sprint 2 — smoke-test-vultr-integration (full 5-stage workflow; first real exercise of the protocol)
+- Sprint 3 — Tool Schema lock + audit log package
+- Sprint 4 — First end-to-end scenario (Scenario A: Stale IV Surface)
+- Sprint 5 — Remaining scenarios (B: Phantom Duplicate, C: Composite Score Inversion)
+- Sprint 6 — Vultr VPS deploy + Coolify setup
+- Sprint 7 — Polish, demo video, submission
 
 ## Open questions
 
