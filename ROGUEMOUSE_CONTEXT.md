@@ -2,8 +2,8 @@
 
 This file is the canonical state of the project. **Update it whenever state changes.** It is read at every session start.
 
-**Last updated**: 2026-05-13
-**Current sprint**: Sprint 1 — Local workspace scaffolding (about to start)
+**Last updated**: 2026-05-14
+**Current sprint**: Sprint 2 — smoke-test-vultr-integration (about to start)
 
 ---
 
@@ -96,6 +96,7 @@ Division of labor:
 - **Tool orchestration**: Planner code calls tools; LLMs reason over tool outputs but do not directly invoke tools
 - **Mock broker**: Deterministic fixture replay only; no live trading anywhere
 - **Sprint pacing**: Workspace scaffolding (Sprint 1) is separated from the smoke test (Sprint 2). Reason: scaffolding is mechanical and unlocks teammate's UI work; smoke test is the first real workflow exercise and benefits from full 5-stage protocol.
+- **First sprint commit pattern**: Single commit per sprint covering all phases, after /review-task passes. Sprint 1's commit (38f8728) covers 39 files; future sprints follow the same pattern. Rationale: clean revert boundary, atomic deploys, single-message commit history aligned with sprint documents.
 
 ## Architectural decisions deferred
 
@@ -117,11 +118,21 @@ Division of labor:
 - Commit: 2102728
 - First lessons.md entry recorded (markdown-paste corruption pattern)
 
-### Sprint 1 — Local workspace scaffolding ⏳ Next
-- Compressed workflow approved (spec+plan combined, no brainstorm — no design decisions worth exploring)
-- Scope: package.json, pnpm-workspace.yaml, tsconfig.base.json, .gitattributes, .env.example, apps/web placeholder, packages/* skeletons (schemas, audit, inference, agent, tools, broker-mock, runbooks)
-- Out of scope: smoke test logic (deferred to Sprint 2)
-- Exit criteria: pnpm install succeeds, pnpm -r typecheck returns clean, apps/web Hello World renders on pnpm dev
+### Sprint 1 — Local workspace scaffolding ✅ Complete (2026-05-14)
+- Compressed workflow: spec+plan combined, no brainstorm (no design decisions worth exploring)
+- 39 files created across root config, 7 package skeletons (`packages/*`), and Next.js app (`apps/web`)
+- pnpm install clean, pnpm -r typecheck clean across 8 typecheckable projects
+- pnpm --filter @roguemouse/web build clean (standalone output produced; Windows Developer Mode required for symlink creation)
+- Dev server verified locally on http://localhost:3000
+- Documentation: docs/sprints/workspace-scaffold/spec-and-plan.md, review.md
+- Commit: 38f8728
+- One deferred item in tasks/todo.md (pre-submission Meridian-reference sweep)
+
+### Sprint 2 — smoke-test-vultr-integration ⏳ Next
+- Full 5-stage workflow (first real exercise of the protocol; not compressed)
+- Goal: validate end-to-end Vultr integration with one chat completion + one audit record + one Object Storage write + one read-back
+- Will lock the audit record Zod schema as a first-class artifact
+- Estimated scope: 200-300 lines across packages/schemas, packages/audit, packages/inference, plus a smoke test runner
 
 ### Sprint queue
 - Sprint 2 — smoke-test-vultr-integration (full 5-stage workflow; first real exercise of the protocol)
