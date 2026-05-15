@@ -16,15 +16,24 @@
     "build": "pnpm -r build",
     "dev": "pnpm --filter @roguemouse/web dev",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint"
+    "typecheck": "pnpm -r typecheck && pnpm typecheck:scripts",
+    "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
+    "lint": "pnpm -r lint",
+    "smoke": "tsx scripts/smoke-vultr.ts"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
+    "@roguemouse/audit": "workspace:*",
+    "@roguemouse/inference": "workspace:*",
+    "@roguemouse/schemas": "workspace:*",
     "@types/node": "^20.0.0",
+    "dotenv": "^16.6.1",
+    "tsx": "^4.22.0",
+    "typescript": "^5.6.0",
     "vitest": "^2.0.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
