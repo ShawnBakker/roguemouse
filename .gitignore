@@ -78,6 +78,9 @@ web_modules/
 .next
 out
 
+# Next.js TypeScript ambient declarations (auto-generated)
+next-env.d.ts
+
 # Nuxt.js build / generate output
 .nuxt
 dist
