@@ -3,7 +3,7 @@
 This file is the canonical state of the project. **Update it whenever state changes.** It is read at every session start.
 
 **Last updated**: 2026-05-16
-**Current sprint**: Sprint 4 — First end-to-end scenario + Gemini integration (about to start)
+**Current sprint**: Sprint 4b — dispatchTool runtime + 8 tool implementations + RAG (about to start)
 
 ---
 
@@ -58,13 +58,15 @@ Division of labor:
 - **Status**: Running, fresh install, cloud-init complete
 - **Coolify**: Not yet installed (planned for Day 2)
 
-## Gemini setup
+## Gemini API
 
-- **Status**: Not yet configured
-- **Planned roles**:
-  - Risk Officer voice: Gemini 2.5 Pro (development), Gemini 3 Pro (demo)
-  - Synthesizer: Gemini Flash
-- **API key**: Not yet generated (Google AI Studio)
+- **Status**: Configured and verified end-to-end (Sprint 4a, 2026-05-16)
+- **API key**: Stored in `.env.local` as `GEMINI_API_KEY` (39-char `AIza...` format from https://aistudio.google.com/apikey); password-manager entry `roguemouse-gemini-api-key`
+- **Models locked for Sprint 4 family**:
+  - Risk Officer voice (Sprint 4a smoke verified, Sprint 4c production): `gemini-2.5-flash`
+  - Synthesizer voice (Sprint 4c): `gemini-2.5-flash`
+- **Why Flash instead of Pro for Risk Officer**: free-tier `gemini-2.5-pro` has `limit: 0` quota and requires billing on the Google Cloud project. Sprint 4a pivoted to `gemini-2.5-flash` via `GEMINI_RISK_MODEL` env var (Decision 3C's env-driven design enabled the one-line resolution). Sprint 7 polish may revisit Pro for the demo if billing is enabled.
+- **Endpoint**: OpenAI-compatibility (`https://generativelanguage.googleapis.com/v1beta/openai/`) via the existing `openai` npm package; zero new direct dependencies. Brainstorm Decision 1B.
 
 ## Credit budget
 
@@ -102,10 +104,12 @@ Division of labor:
 - **Discriminated union shape for the audit record body**: envelope-level z.discriminatedUnion("recordType", [...]) rather than internal "kind" tagging on the payload. Established in Sprint 3 Phase 4. Rationale: single source of truth (recordType is the only discriminator); no redundant tags in serialized records; Zod's safeParse narrows the payload type at consumers; compile-time recordType ↔ payload coupling.
 - **Tool schema pattern: shared defineTool helper + TOOLS registry**: 8 tool definitions, each constructed via defineTool(name, argsSchema, resultDataSchema), aggregated in a TOOLS const object exported from @roguemouse/schemas. ToolName, ArgsFor<TName>, DataFor<TName> derived from the registry. Established in Sprint 3 Phase 3. Rationale: generic dispatch becomes possible (dispatchTool<TName>(name, args)); audit logging is uniform (one tool:call recordType, one tool:result recordType across all 8 tools); adding a 9th tool is a registry extension, not a schema change.
 - **Leaf-module discipline for shared primitives**: validation primitives that multiple sibling modules need (regex constants, literal arrays) live in a zero-import leaf module (packages/schemas/src/primitives.ts). The module imports nothing — not even zod. Established in Sprint 3 Phase 4 amendment. Rationale: prevents circular imports that would otherwise arise when sibling modules cross-reference each other through shared constants. Pattern is reusable for any future shared primitive.
+- **Gemini model selection for Sprint 4 family**: Risk Officer voice uses `gemini-2.5-flash` (Sprint 4a verified); Synthesizer voice uses `gemini-2.5-flash` (Sprint 4c, planned). Pro 2.5 was the original target but free-tier quota = 0 forced the pivot. Sprint 7 polish may upgrade Risk Officer to Pro 2.5 IF billing is enabled on the Google Cloud project before the demo. Decision date: Sprint 4a Phase 4 (2026-05-16). Captured in `tasks/lessons.md`.
+- **Cross-provider envelope discipline validated through symmetric classifier extraction**: One wrapped chat-completion function shape serves both Vultr Nemotron (Sprint 2) and Gemini (Sprint 4a) by going through the openai SDK pointed at different baseURLs. The error classifier (`classifyInferenceError`) was extracted from `chatCompletion.ts` (file-local) to `packages/inference/src/errors.ts` (package-internal, mirrors `packages/audit/src/errors.ts`'s `classifyS3Error` precedent) so both provider wrappers can share it. Established in Sprint 4a Phase 2. Rationale: any third LLM provider that goes through the openai SDK (which Gemini uses, and several others do too) reuses this classifier without modification. The envelope shape (`{ok: true, data, usage?} | {ok: false, error: {code, message, retryable, step?}}`) is now the cross-package standard across `@roguemouse/inference` and `@roguemouse/audit`.
+- **Errors-module pattern: provider-internal HTTP/network error classifier in a dedicated file**: Two instances of the pattern now exist — `packages/audit/src/errors.ts` (`classifyS3Error`, Sprint 2) and `packages/inference/src/errors.ts` (`classifyInferenceError`, Sprint 4a). The shape is consistent: a classifier function that translates SDK-specific exceptions into the package's structured error envelope; the classifier is package-internal (not exported from the barrel); JSDoc cross-references the other instance. Pattern is now established for any future I/O package.
 
 ## Architectural decisions deferred
 
-- Specific Gemini model versions (Pro 2.5 vs 3, Flash 1.5 vs 2.5) — verify at first Gemini integration
 - UI framework decisions inside Tailwind (component library? shadcn/ui?) — defer to Day 4
 
 ## Artifacts
@@ -137,6 +141,16 @@ audit/a35daa82-f0f3-43d8-b945-7f52def87c27/2026-05-16T07-20-54.940Z-71dfe6cc8adf
 ```
 
 Bucket: `roguemouse-audit-log`, region `ams1`. Run ID: `a35daa82-f0f3-43d8-b945-7f52def87c27`. Record hash: `71dfe6cc8adf71e53b4702e9c8bf5a85fb02a15adae7e85b400803fbf30ae1fa`. This record's `previousHash` field is the genesis hash above (identical to the Sprint 2 first record's previousHash — both are chain-rooted at genesis). The record proves the Sprint 3 refactor (discriminated union narrowing, canonicalize relocation, primitives.ts extraction, writer-side typing fix) preserved end-to-end Vultr round-trip integrity.
+
+### Third audit record / Sprint 4a verification artifact (Sprint 4a Phase 4, 2026-05-16T21:42:34 UTC)
+
+S3 object key:
+
+```
+audit/0ca812ef-3214-4e98-ad43-9b1fddbdd4aa/2026-05-16T21-42-34.772Z-a02091694720ccd80831f2283315a1ee89c1efa07eb47635d4ab225f2a9303dc.json
+```
+
+Bucket: `roguemouse-audit-log`, region `ams1`. Run ID: `0ca812ef-3214-4e98-ad43-9b1fddbdd4aa`. Record hash: `a02091694720ccd80831f2283315a1ee89c1efa07eb47635d4ab225f2a9303dc`. Model used: `gemini-2.5-flash` (env-driven pivot from `gemini-2.5-pro` due to free-tier quota; documented in `tasks/lessons.md`). Token usage: 49 prompt / 40 completion / 1045 total (the 956-token gap is Flash's thinking-mode allocation, enabled by default through the OpenAI-compat endpoint). This is the third audit record overall in the bucket AND the first-ever `risk_officer:reasoning` record — the first of 12 locked recordType branches from Sprint 3 to be exercised end-to-end.
 
 ## Sprint status
 
@@ -202,21 +216,39 @@ Bucket: `roguemouse-audit-log`, region `ams1`. Run ID: `a35daa82-f0f3-43d8-b945-
 - Documentation: docs/sprints/tool-schema-and-payload-narrowing/{brainstorm,spec,plan,review}.md
 - No new dependencies added in this sprint (zero package.json changes)
 
-### Sprint 4 — First end-to-end scenario + Gemini integration ⏳ Next
-- Full 5-stage workflow (third real exercise; the highest-risk sprint of the project)
-- This sprint converges several previously-deferred unknowns: first Gemini API call, multi-agent debate logic, first multi-record audit chain, tool dispatch runtime, 8 tool implementations, first synthetic scenario, application-layer RAG
-- Goals (to be sequenced during brainstorm):
-  1. Gemini integration verified end-to-end (analogous to Sprint 2's Vultr smoke test)
-  2. dispatchTool runtime implementation in @roguemouse/agent
-  3. 8 tool implementations in @roguemouse/tools (Sprint 3 locked the schemas; Sprint 4 provides behavior)
-  4. Multi-agent debate runtime: Risk Officer voice (Gemini) + Ops Engineer voice (Vultr Nemotron) + Synthesizer voice (Gemini Flash)
-  5. Scenario A: Stale IV Surface — first end-to-end synthetic scenario with anomaly detection, agent reasoning, tool invocation, and proposal/refusal output
-  6. Application-layer RAG over the runbook corpus (5 runbooks landed in 0e7681b)
-- Brainstorm will likely split this into 4a (Gemini smoke), 4b (dispatch + tools), 4c (scenario A assembly) for tractable scope
-- Estimated scope: very large, may span 2-3 calendar days
+### Sprint 4 — First end-to-end scenario + Gemini integration (split into 4a/4b/4c)
+
+#### Sprint 4a — Gemini integration smoke test ✅ Complete (2026-05-16)
+- Goal 1 of the original Sprint 4 plan: verify Gemini API integration end-to-end, analogous to Sprint 2's Vultr smoke test
+- 27 acceptance criteria all PASS, verified against on-disk code + live Phase 4 PASS report
+- Live smoke run against real Gemini + real Vultr: exit 0, 5787ms total
+- Third audit record in the bucket (first-ever `risk_officer:reasoning` recordType)
+- Model used: `gemini-2.5-flash` (env-driven pivot from `gemini-2.5-pro` due to free-tier quota = 0; documented in `lessons.md`)
+- Cross-provider envelope discipline validated: `classifyInferenceError` extracted from `chatCompletion.ts` to `errors.ts`; both Vultr and Gemini wrappers share it
+- Commit: 12174f3
+- Documentation: docs/sprints/gemini-integration-smoke-test/{brainstorm,spec,plan,review}.md
+- 12 files changed, 2,214 insertions, 72 deletions
+- No new dependencies (Decision 1B held)
+
+#### Sprint 4b — dispatchTool runtime + 8 tool implementations + RAG ⏳ Next
+- Goals 2, 3, and 6 of the original Sprint 4 plan
+- Implements the 8 tool schemas locked in Sprint 3: `market_data:lookup`, `runbook:search`, `position:snapshot`, `broker:reconcile`, `audit:append`, `audit:search`, `score:explain`, `policy:check`
+- Implements the `dispatchTool<TName>(name, args)` runtime in `@roguemouse/agent` (Sprint 3 locked the type signature; this sprint provides behavior)
+- Implements application-layer RAG over the runbook corpus (5 runbooks landed in 0e7681b, used by `runbook:search` tool)
+- Estimated scope: large; Sunday's work, possibly into Monday morning
+- Key open questions for brainstorm: which tools are dispatched in parallel vs serial; how the dispatch logs `tool:call` and `tool:result` audit records without recursing into `audit:append`; how RAG retrieval is implemented (in-memory keyword match for the hackathon; vector DB deferred to post-submission)
+
+#### Sprint 4c — Scenario A: Stale IV Surface ⏳ Queued
+- Goals 4 and 5 of the original Sprint 4 plan
+- Multi-agent debate runtime: Risk Officer voice (`gemini-2.5-flash`) + Ops Engineer voice (Vultr Nemotron) + Synthesizer voice (`gemini-2.5-flash`)
+- End-to-end scenario assembly: anomaly detection → tool invocation → multi-agent debate → proposal/refusal output → multi-record audit chain
+- First scenario that writes ~120 audit records per run (vs Sprints 2/3/4a which each wrote one)
+- Estimated scope: medium-large; Monday's work
+- Submission deadline: Tuesday May 19 17:00 CEST (08:00 PDT); 4c MUST land by Monday evening to leave Tuesday morning for Sprint 5/6/7 minimum-viable polish
 
 ### Sprint queue
-- Sprint 5 — Remaining scenarios (B: Phantom Duplicate, C: Composite Score Inversion); inherits the agent loop from Sprint 4
+- Sprint 4c — Scenario A: Stale IV Surface (queued after 4b)
+- Sprint 5 — Remaining scenarios (B: Phantom Duplicate, C: Composite Score Inversion); inherits the agent loop from Sprint 4c
 - Sprint 6 — Vultr VPS deploy + Coolify setup
 - Sprint 7 — Polish, demo video, slide deck, submission copy, cover image
 
