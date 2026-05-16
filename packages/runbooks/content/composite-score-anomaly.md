@@ -8,7 +8,7 @@ Fired automatically by the governance layer into `#trading-ops-alerts` when an a
 
 1. **Inspect Logged Feature Inputs:** Pull the exact token evaluation block that generated the anomalous composite score. Inspect the raw numeric array sent to the inference parser.
 2. **Trace Weight Signatures:** Check for negative multiplier injections within the strategy's dynamic feature calculation modules. Verify that recent weight adaptations haven't caused a sign-flip inversion.
-3. **Query Inference Raw Payload:** Check the raw output from the VULTR_OPS_MODEL before it gets normalized by the governance layer. Determine if the anomaly originated within the model's response or during parsing.
+3. **Query Inference Raw Payload:** Check the raw output from the upstream inference model before it gets normalized by the governance layer. Determine if the anomaly originated within the model's response or during parsing.
 4. **Check Nan/Infinity Accumulation:** Review calculation steps to ensure an unhandled `NaN` or `Infinity` float value didn't cascade through the matrix multiplication steps, breaking signed-score constraints.
 
 ## Mitigation
