@@ -9,28 +9,44 @@ import type {
 } from "./types.js";
 
 /**
- * Default per-call `max_tokens`. The smoke prompt expects a single short
- * word ("OK"), so 500 is generous headroom; raising it costs nothing
- * since billing is on actual completion tokens.
+ * Default per-call `max_tokens` for Gemini calls. Higher than the
+ * Vultr `chatCompletion` default (500) because Gemini reasoning models
+ * (e.g., gemini-2.5-pro) tend to produce longer reasoning responses.
+ * 1000 gives ample headroom for the Risk Officer voice's reasoning
+ * output without being wasteful — billing is on actual completion
+ * tokens, not the max_tokens ceiling.
  */
-const DEFAULT_MAX_TOKENS = 500;
+const DEFAULT_MAX_TOKENS = 1000;
 
 /**
- * Perform a single chat completion against the configured client.
+ * Perform a single chat completion against the configured Gemini client.
  *
  * Returns a discriminated-union envelope (`InferenceResult<ChatCompletionData>`):
  *   - On success the envelope carries the extracted `content`, the model
- *     identifier echoed by the provider, the `finish_reason` (or null),
- *     and a camelCase `TokenUsage` re-keyed from the provider's snake_case.
+ *     identifier echoed by Gemini, the `finish_reason` (or null), and a
+ *     camelCase `TokenUsage` re-keyed from Gemini's OpenAI-compat
+ *     snake_case (`prompt_tokens` / `completion_tokens` / `total_tokens`).
  *   - On failure the envelope carries an `InferenceError` with a `code`,
- *     a `message`, and a `retryable` flag for Sprint 3's circuit breaker.
+ *     a `message`, and a `retryable` flag.
  *
- * Per CLAUDE.md hard rule 5, this function NEVER throws. Every error path —
- * including SDK exceptions, network errors, malformed responses, and empty
- * responses — flows through `classifyInferenceError` (from `./errors.js`)
- * into the envelope.
+ * Structurally identical to `chatCompletion` (the Vultr path) except for:
+ *   1. `DEFAULT_MAX_TOKENS = 1000` (vs Vultr's 500).
+ *   2. Intended call site is Gemini's OpenAI-compat endpoint
+ *      (`https://generativelanguage.googleapis.com/v1beta/openai/`),
+ *      configured via `createGeminiClient`.
+ *
+ * Error classification is shared with `chatCompletion` via the
+ * package-internal `classifyInferenceError` in `./errors.js`. Per Sprint
+ * 4a Brainstorm Decision 6A, Gemini errors map cleanly into the
+ * `InferenceError` envelope without provider-specific extension —
+ * including HTTP failures, network errors, malformed responses, and
+ * safety-blocked responses (which surface as empty content via
+ * `finish_reason: "content_filter"` or analog).
+ *
+ * Per CLAUDE.md hard rule 5, this function NEVER throws. Every error
+ * path flows through `classifyInferenceError` into the envelope.
  */
-export async function chatCompletion(
+export async function geminiChatCompletion(
   client: OpenAI,
   args: ChatCompletionArgs,
 ): Promise<InferenceResult<ChatCompletionData>> {
@@ -49,7 +65,7 @@ export async function chatCompletion(
         error: {
           code: "empty_response",
           message:
-            "Inference response had no content in choices[0].message.content",
+            "Gemini response had no content in choices[0].message.content (possible safety block or rate-limited completion)",
           retryable: true,
         },
       };
@@ -70,7 +86,7 @@ export async function chatCompletion(
         error: {
           code: "malformed_response",
           message:
-            "Inference response had missing or non-integer token usage",
+            "Gemini response had missing or non-integer token usage",
           retryable: false,
         },
       };

@@ -19,7 +19,8 @@
     "typecheck": "pnpm -r typecheck && pnpm typecheck:scripts",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "lint": "pnpm -r lint",
-    "smoke": "tsx scripts/smoke-vultr.ts"
+    "smoke": "tsx scripts/smoke-vultr.ts",
+    "smoke:gemini": "tsx scripts/smoke-gemini.ts"
   },
   "devDependencies": {
     "@roguemouse/audit": "workspace:*",
