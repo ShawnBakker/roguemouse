@@ -26,6 +26,13 @@ export type S3ClientConfig = {
  * The writer fills in `previousHash` from its in-memory chain state and
  * `runId` from its constructor, so callers supply only the record-specific
  * fields. This is structurally `Omit<AuditRecordBody, "previousHash" | "runId">`.
+ *
+ * After Sprint 3 Phase 4, `AuditRecordBody` is a discriminated union over
+ * the 12 locked `recordType` values, so `AppendInput` is also a
+ * discriminated union (the `Omit` distributes over the union). Constructing
+ * an `AppendInput` literal where `payload` does not match the shape locked
+ * for `recordType` is a compile-time error at the call site — the writer
+ * cannot be invoked with a mismatched pair.
  */
 export type AppendInput = Omit<AuditRecordBody, "previousHash" | "runId">;
 

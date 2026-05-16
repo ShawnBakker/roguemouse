@@ -11,7 +11,6 @@ import { config as loadDotenv } from "dotenv";
 import {
   GENESIS_HASH,
   RunAuditWriter,
-  canonicalize,
   createS3Client,
   sha256Hex,
 } from "@roguemouse/audit";
@@ -19,7 +18,7 @@ import {
   chatCompletion,
   createInferenceClient,
 } from "@roguemouse/inference";
-import { smokeTestChatCompletionPayloadSchema } from "@roguemouse/schemas";
+import { canonicalize } from "@roguemouse/schemas";
 
 // ---------------------------------------------------------------------------
 // Bootstrap: locate and load .env.local from the repo root (one level up
@@ -209,7 +208,13 @@ async function main(): Promise<void> {
 
   console.log(`[smoke] inference complete (${inferenceMs}ms)`);
 
-  // --- Step 2: Build and validate payload ---
+  // --- Step 2: Build the payload. ---
+  // Payload shape validation is no longer performed as a separate step:
+  // after Sprint 3 Phase 4, the audit writer's internal `safeParse`
+  // against the discriminated union (`auditRecordBodySchema`) covers
+  // it. A shape error surfaces as `AppendResult` `{ ok: false, error:
+  // { code: "validation_error", step: "validate", ... } }`, picked up
+  // by the existing failure handler on the writer.append result.
   const payload = {
     model: inferenceResult.data.model,
     prompt: truncate500(SMOKE_PROMPT),
@@ -221,19 +226,6 @@ async function main(): Promise<void> {
     },
     durationMs: inferenceMs,
   };
-
-  const payloadParse = smokeTestChatCompletionPayloadSchema.safeParse(payload);
-  if (!payloadParse.success) {
-    failNoState(
-      "schema_validation",
-      "audit payload failed smokeTestChatCompletionPayloadSchema validation",
-      {
-        issues: payloadParse.error.issues
-          .map((i) => `${i.path.join(".")}: ${i.message}`)
-          .join("; "),
-      },
-    );
-  }
 
   // --- Step 3: Construct S3 client + writer ---
   const s3Client = createS3Client({
@@ -256,7 +248,7 @@ async function main(): Promise<void> {
   const appendResult = await writer.append({
     ts: new Date().toISOString(),
     recordType: RECORD_TYPE,
-    payload: payloadParse.data,
+    payload,
   });
   const s3PutMs = Math.round(performance.now() - putStart);
 

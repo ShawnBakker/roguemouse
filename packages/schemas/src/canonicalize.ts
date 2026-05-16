@@ -1,4 +1,4 @@
-import { validateCanonicalSafe } from "@roguemouse/schemas";
+import { validateCanonicalSafe } from "./canonicalSafe.js";
 
 /**
  * Produce a canonical JSON serialization of a value, suitable for hashing.

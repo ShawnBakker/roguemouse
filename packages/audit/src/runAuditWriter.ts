@@ -4,7 +4,7 @@ import {
   type S3Client,
 } from "@aws-sdk/client-s3";
 
-import { auditRecordBodySchema, type AuditRecordBody } from "@roguemouse/schemas";
+import { auditRecordBodySchema } from "@roguemouse/schemas";
 
 import { classifyS3Error } from "./errors.js";
 import { GENESIS_HASH } from "./genesis.js";
@@ -93,7 +93,15 @@ export class RunAuditWriter {
    * cannot fail; step 7 only runs on success.
    */
   async append(input: AppendInput): Promise<AppendResult> {
-    const record: AuditRecordBody = {
+    // The local `record` is intentionally not annotated as
+    // `AuditRecordBody`. After Sprint 3 Phase 4, `AuditRecordBody`
+    // is a discriminated union; assembling fields from `input`
+    // independently loses the recordType ↔ payload correlation, so
+    // an explicit annotation cannot find a matching branch even
+    // though the resulting object IS valid. Runtime validation via
+    // `safeParse` (which accepts `unknown`) remains the source of
+    // truth.
+    const record = {
       ts: input.ts,
       runId: this.runId,
       recordType: input.recordType,
