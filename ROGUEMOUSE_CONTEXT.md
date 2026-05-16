@@ -2,8 +2,8 @@
 
 This file is the canonical state of the project. **Update it whenever state changes.** It is read at every session start.
 
-**Last updated**: 2026-05-15
-**Current sprint**: Sprint 3 — Tool Schema lock + audit log consolidation (about to start)
+**Last updated**: 2026-05-16
+**Current sprint**: Sprint 4 — First end-to-end scenario + Gemini integration (about to start)
 
 ---
 
@@ -99,6 +99,9 @@ Division of labor:
 - **First sprint commit pattern**: Single commit per sprint covering all phases, after /review-task passes. Sprint 1's commit (38f8728) covers 39 files; future sprints follow the same pattern. Rationale: clean revert boundary, atomic deploys, single-message commit history aligned with sprint documents.
 - **Envelope discipline for all I/O packages**: @roguemouse/inference and @roguemouse/audit both expose functions returning `{ ok: true, data, ... } | { ok: false, error: { code, message, retryable, step? } }` discriminated unions. Public APIs never throw — every error path returns a structured envelope. Established in Sprint 2 (Phase 3 for inference, Phase 4 for audit). Rationale: consumers write `if (result.ok)` instead of try/catch; Sprint 3+ circuit breakers and retries can be added without changing call sites.
 - **AppendInput omits chain-controlled fields**: RunAuditWriter.append takes Omit<AuditRecordBody, "previousHash" | "runId"> rather than the full envelope. previousHash is owned by the writer's hash chain state; runId is owned by the constructor. The API surface makes chain corruption impossible by construction. Established in Sprint 2 (Phase 4). Rationale: defense in depth — the audit log integrity story doesn't rely on callers passing correct values, because they can't pass them at all.
+- **Discriminated union shape for the audit record body**: envelope-level z.discriminatedUnion("recordType", [...]) rather than internal "kind" tagging on the payload. Established in Sprint 3 Phase 4. Rationale: single source of truth (recordType is the only discriminator); no redundant tags in serialized records; Zod's safeParse narrows the payload type at consumers; compile-time recordType ↔ payload coupling.
+- **Tool schema pattern: shared defineTool helper + TOOLS registry**: 8 tool definitions, each constructed via defineTool(name, argsSchema, resultDataSchema), aggregated in a TOOLS const object exported from @roguemouse/schemas. ToolName, ArgsFor<TName>, DataFor<TName> derived from the registry. Established in Sprint 3 Phase 3. Rationale: generic dispatch becomes possible (dispatchTool<TName>(name, args)); audit logging is uniform (one tool:call recordType, one tool:result recordType across all 8 tools); adding a 9th tool is a registry extension, not a schema change.
+- **Leaf-module discipline for shared primitives**: validation primitives that multiple sibling modules need (regex constants, literal arrays) live in a zero-import leaf module (packages/schemas/src/primitives.ts). The module imports nothing — not even zod. Established in Sprint 3 Phase 4 amendment. Rationale: prevents circular imports that would otherwise arise when sibling modules cross-reference each other through shared constants. Pattern is reusable for any future shared primitive.
 
 ## Architectural decisions deferred
 
@@ -119,9 +122,21 @@ SHA-256 of the UTF-8 bytes of the literal string `roguemouse-audit-genesis-v1`. 
 
 S3 object key:
 
-`audit/e7ec58ef-c65a-47ee-9b4f-095e073d23f7/2026-05-15T07-26-03.694Z-d963304fcc1d89806ee836d663c0087aabe922bdc03a51613bffc6cd78d0fb13.json`
+```
+audit/e7ec58ef-c65a-47ee-9b4f-095e073d23f7/2026-05-15T07-26-03.694Z-d963304fcc1d89806ee836d663c0087aabe922bdc03a51613bffc6cd78d0fb13.json
+```
 
 Bucket: `roguemouse-audit-log`, region `ams1`, endpoint `https://ams1.vultrobjects.com`. Run ID: `e7ec58ef-c65a-47ee-9b4f-095e073d23f7`. Record hash: `d963304fcc1d89806ee836d663c0087aabe922bdc03a51613bffc6cd78d0fb13`. This record's `previousHash` field is the genesis hash above. It is the "patient zero" of every chain we ever write — the first proof that the integration works end-to-end.
+
+### Second audit record / Sprint 3 verification artifact (Sprint 3 Phase 5, 2026-05-16T07:20:54 UTC)
+
+S3 object key:
+
+```
+audit/a35daa82-f0f3-43d8-b945-7f52def87c27/2026-05-16T07-20-54.940Z-71dfe6cc8adf71e53b4702e9c8bf5a85fb02a15adae7e85b400803fbf30ae1fa.json
+```
+
+Bucket: `roguemouse-audit-log`, region `ams1`. Run ID: `a35daa82-f0f3-43d8-b945-7f52def87c27`. Record hash: `71dfe6cc8adf71e53b4702e9c8bf5a85fb02a15adae7e85b400803fbf30ae1fa`. This record's `previousHash` field is the genesis hash above (identical to the Sprint 2 first record's previousHash — both are chain-rooted at genesis). The record proves the Sprint 3 refactor (discriminated union narrowing, canonicalize relocation, primitives.ts extraction, writer-side typing fix) preserved end-to-end Vultr round-trip integrity.
 
 ## Sprint status
 
@@ -166,20 +181,44 @@ Bucket: `roguemouse-audit-log`, region `ams1`, endpoint `https://ams1.vultrobjec
 - One lesson added during the sprint (Phase 1 conditional-exports resolution discipline)
 - One deferred item added to tasks/todo.md (RFC 8785 canonicalization migration trigger)
 
-### Sprint 3 — Tool Schema lock + audit log consolidation ⏳ Next
-- Full 5-stage workflow (second real exercise of the protocol)
-- Goals:
-  1. Lock the 8 agent tool schemas as discriminated unions in @roguemouse/schemas
-  2. Narrow audit record payload from `payload: unknown` to a discriminated union keyed on recordType
-  3. Consolidate canonicalization rules (currently split between @roguemouse/schemas and @roguemouse/audit)
-- Will close the Day 2 kill-switch checkpoint (Tool Schema locked = Vector Store RAG stays in scope)
-- Estimated scope: 300-500 lines, mostly schemas + tests, no new external integrations
+### Sprint 3 — Tool Schema lock + audit log consolidation ✅ Complete (2026-05-16)
+- Full 5-stage workflow (second real exercise of the protocol): brainstorm → spec → plan → implement (5 code phases + 1 review) → review
+- 31 files changed, 3,727 insertions across packages/schemas (mostly), packages/audit, scripts/
+- 36 acceptance criteria all PASS, verified against on-disk code and live Phase 5 run output
+- Live Phase 5 smoke run against real Vultr (post-refactor): exit 0, 2566ms total, $0.000090 cost
+- Round-trip integrity verified end-to-end through the discriminated-union narrowing + canonicalize migration
+- Day 2 hackathon kill-switch retroactively closed: Tool Schema + Audit Schema are both locked
+- Locked artifacts (inherited by Sprint 4+):
+  - Audit record envelope: z.discriminatedUnion("recordType", [...12 branches...]) with `.strict()` per branch
+  - 12 recordType literals: smoke_test:chat_completion, tool:call, tool:result, anomaly:detected, risk_officer:reasoning, ops_engineer:reasoning, synthesizer:reasoning, synthesizer:proposal, synthesizer:refusal, human:approval, human:rejection, final:committed
+  - 8 agent tool schemas in @roguemouse/schemas/tools/: market_data:lookup, runbook:search, position:snapshot, broker:reconcile, audit:append, audit:search, score:explain, policy:check
+  - Tool result envelope: { ok: true, data: T } | { ok: false, error: ToolError } — same shape as inference/audit envelopes
+  - dispatchTool<TName>(name, args) type signature: narrows args + return type by name literal; runtime implementation deferred to Sprint 4
+  - canonicalize relocated from @roguemouse/audit to @roguemouse/schemas (rules + serializer co-located)
+  - sha256Hex, GENESIS_HASH, GENESIS_SEED remain in @roguemouse/audit
+  - primitives.ts (leaf module in @roguemouse/schemas): ISO_TIMESTAMP_MS_REGEX, HEX_64_REGEX, TOOL_NAME_LITERALS
+  - AppendInput is now a discriminated union via Omit distribution: mismatched recordType+payload pairs are compile-time errors
+- Commit: 0e61f0a
+- Documentation: docs/sprints/tool-schema-and-payload-narrowing/{brainstorm,spec,plan,review}.md
+- No new dependencies added in this sprint (zero package.json changes)
+
+### Sprint 4 — First end-to-end scenario + Gemini integration ⏳ Next
+- Full 5-stage workflow (third real exercise; the highest-risk sprint of the project)
+- This sprint converges several previously-deferred unknowns: first Gemini API call, multi-agent debate logic, first multi-record audit chain, tool dispatch runtime, 8 tool implementations, first synthetic scenario, application-layer RAG
+- Goals (to be sequenced during brainstorm):
+  1. Gemini integration verified end-to-end (analogous to Sprint 2's Vultr smoke test)
+  2. dispatchTool runtime implementation in @roguemouse/agent
+  3. 8 tool implementations in @roguemouse/tools (Sprint 3 locked the schemas; Sprint 4 provides behavior)
+  4. Multi-agent debate runtime: Risk Officer voice (Gemini) + Ops Engineer voice (Vultr Nemotron) + Synthesizer voice (Gemini Flash)
+  5. Scenario A: Stale IV Surface — first end-to-end synthetic scenario with anomaly detection, agent reasoning, tool invocation, and proposal/refusal output
+  6. Application-layer RAG over the runbook corpus (5 runbooks landed in 0e7681b)
+- Brainstorm will likely split this into 4a (Gemini smoke), 4b (dispatch + tools), 4c (scenario A assembly) for tractable scope
+- Estimated scope: very large, may span 2-3 calendar days
 
 ### Sprint queue
-- Sprint 4 — First end-to-end scenario (Scenario A: Stale IV Surface), introduces Gemini integration
-- Sprint 5 — Remaining scenarios (B: Phantom Duplicate, C: Composite Score Inversion)
+- Sprint 5 — Remaining scenarios (B: Phantom Duplicate, C: Composite Score Inversion); inherits the agent loop from Sprint 4
 - Sprint 6 — Vultr VPS deploy + Coolify setup
-- Sprint 7 — Polish, demo video, slide deck, submission copy
+- Sprint 7 — Polish, demo video, slide deck, submission copy, cover image
 
 ## Open questions
 
