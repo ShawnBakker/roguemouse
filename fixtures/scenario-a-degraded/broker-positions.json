@@ -1,0 +1,20 @@
+[
+  {
+    "symbol": "AAPL",
+    "quantity": 140,
+    "brokerAccountId": "BROKER-001",
+    "asOf": "2026-05-16T09:31:14.000Z"
+  },
+  {
+    "symbol": "MSFT",
+    "quantity": 49,
+    "brokerAccountId": "BROKER-001",
+    "asOf": "2026-05-16T09:31:14.000Z"
+  },
+  {
+    "symbol": "GOOGL",
+    "quantity": 25,
+    "brokerAccountId": "BROKER-001",
+    "asOf": "2026-05-16T09:31:14.000Z"
+  }
+]

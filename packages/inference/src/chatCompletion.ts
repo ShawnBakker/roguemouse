@@ -39,6 +39,7 @@ export async function chatCompletion(
       model: args.model,
       messages: args.messages,
       max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
+      ...(args.responseFormat ? { response_format: args.responseFormat } : {}),
     });
 
     const choice = response.choices[0];

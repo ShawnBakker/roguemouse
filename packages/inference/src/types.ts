@@ -52,6 +52,16 @@ export type ChatCompletionArgs = {
   messages: ChatMessage[];
   /** Optional override of the default per-call max-tokens (currently 500). */
   maxTokens?: number;
+  /**
+   * Optional OpenAI-style structured-output hint. When set to
+   * `{ type: "json_object" }`, the provider is asked to constrain its
+   * response to a JSON object. Used by Sprint 4c's Synthesizer voice
+   * (Gemini Flash) to produce a Zod-validatable JSON envelope.
+   * Phase 2's pre-implementation probe confirmed Gemini's OpenAI-compat
+   * endpoint accepts this parameter; Vultr Nemotron support is
+   * untested and currently unused for this purpose.
+   */
+  responseFormat?: { type: "json_object" };
 };
 
 /**

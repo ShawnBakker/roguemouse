@@ -1,0 +1,9 @@
+{
+  "anomalyId": "anom-aapl-iv-rv-20260516-093114-degraded",
+  "symbol": "AAPL",
+  "metric": "iv_rv_ratio",
+  "observedValue": 4400,
+  "lowBoundThreshold": 4500,
+  "highBoundThreshold": 9500,
+  "detectedAt": "2026-05-16T09:31:14.000Z"
+}

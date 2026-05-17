@@ -21,7 +21,8 @@
     "lint": "pnpm -r lint",
     "smoke": "tsx scripts/smoke-vultr.ts",
     "smoke:gemini": "tsx scripts/smoke-gemini.ts",
-    "smoke:dispatch": "tsx scripts/smoke-dispatch.ts"
+    "smoke:dispatch": "tsx scripts/smoke-dispatch.ts",
+    "scenario:a": "tsx scripts/scenario-a.ts"
   },
   "devDependencies": {
     "@roguemouse/agent": "workspace:*",

@@ -12,7 +12,7 @@ import {
   type ScenarioAFixtures,
 } from "./scenarioASchema.js";
 
-const FIXTURES_SUBDIR = path.join("fixtures", "scenario-a");
+const DEFAULT_FIXTURES_SUBDIR = path.join("fixtures", "scenario-a");
 
 const MARKET_DATA_FILE = "market-data.json";
 const POSITIONS_FILE = "positions.json";
@@ -60,8 +60,26 @@ function safeParse<T extends z.ZodTypeAny>(
   return result.data;
 }
 
-export async function loadScenarioA(rootDir: string): Promise<ScenarioAFixtures> {
-  const dir = path.join(rootDir, FIXTURES_SUBDIR);
+/**
+ * Load the Scenario A fixture set from disk and Zod-parse each of the
+ * four JSON files.
+ *
+ *  - `rootDir`: usually the repo root (e.g., `process.cwd()` from a
+ *    script invocation).
+ *  - `subdir`: optional override of the fixtures subdirectory.
+ *    Defaults to `"fixtures/scenario-a"`. Sprint 4c's `--degraded`
+ *    flag passes `"fixtures/scenario-a-degraded"` to load the
+ *    semantically-uncertain fixture set without changing the loader's
+ *    parsing logic.
+ *
+ * Zod failures, missing files, and malformed JSON all throw clear
+ * errors naming the offending path.
+ */
+export async function loadScenarioA(
+  rootDir: string,
+  subdir: string = DEFAULT_FIXTURES_SUBDIR,
+): Promise<ScenarioAFixtures> {
+  const dir = path.join(rootDir, subdir);
 
   const marketDataPath = path.join(dir, MARKET_DATA_FILE);
   const positionsPath = path.join(dir, POSITIONS_FILE);

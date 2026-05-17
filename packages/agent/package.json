@@ -15,8 +15,12 @@
   },
   "dependencies": {
     "@roguemouse/audit": "workspace:*",
+    "@roguemouse/inference": "workspace:*",
     "@roguemouse/runbooks": "workspace:*",
     "@roguemouse/schemas": "workspace:*",
-    "@roguemouse/tools": "workspace:*"
+    "@roguemouse/tools": "workspace:*",
+    "openai": "^4.104.0",
+    "zod": "^3.25.76"
   }
+
 }
