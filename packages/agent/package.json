@@ -5,9 +5,18 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@roguemouse/audit": "workspace:*",
+    "@roguemouse/runbooks": "workspace:*",
+    "@roguemouse/schemas": "workspace:*",
+    "@roguemouse/tools": "workspace:*"
   }
 }

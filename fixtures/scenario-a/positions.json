@@ -1,0 +1,26 @@
+[
+  {
+    "strategy": "iv-rv-monitor",
+    "symbol": "AAPL",
+    "quantity": 100,
+    "avgEntryPrice": 19200,
+    "currentPrice": 19450,
+    "asOf": "2026-05-16T09:31:14.000Z"
+  },
+  {
+    "strategy": "iv-rv-monitor",
+    "symbol": "MSFT",
+    "quantity": 50,
+    "avgEntryPrice": 42000,
+    "currentPrice": 42100,
+    "asOf": "2026-05-16T09:31:14.000Z"
+  },
+  {
+    "strategy": "momentum-baseline",
+    "symbol": "GOOGL",
+    "quantity": 25,
+    "avgEntryPrice": 17500,
+    "currentPrice": 17850,
+    "asOf": "2026-05-16T09:31:14.000Z"
+  }
+]

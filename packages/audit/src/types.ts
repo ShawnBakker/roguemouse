@@ -73,6 +73,21 @@ export type ReadData = {
 };
 
 /**
+ * Result data for `RunAuditWriter#list`.
+ *
+ * Single-page semantics: `keys` reflects the contents of one S3
+ * `ListObjectsV2` page and `hasMore` mirrors the response's
+ * `IsTruncated` flag. The caller chooses whether (and how) to paginate
+ * further — the writer never auto-continues.
+ */
+export type ListData = {
+  /** Object keys returned by S3 for the requested prefix + MaxKeys. */
+  keys: readonly string[];
+  /** `true` iff the S3 response carried `IsTruncated: true`. */
+  hasMore: boolean;
+};
+
+/**
  * Audit-writer error envelope. Returned through `AppendResult` or `ReadResult`
  * whenever an operation fails. Same envelope-discipline pattern as
  * `@roguemouse/inference`'s `InferenceError`.
@@ -95,4 +110,8 @@ export type AppendResult =
 
 export type ReadResult =
   | { ok: true; data: ReadData }
+  | { ok: false; error: AuditError };
+
+export type ListResult =
+  | { ok: true; data: ListData }
   | { ok: false; error: AuditError };

@@ -1,0 +1,20 @@
+{
+  "AAPL": {
+    "spotPrice": 19450,
+    "impliedVolatility": 1680,
+    "realizedVolatility": 4000,
+    "surfaceTs": "2026-05-16T09:31:14.000Z"
+  },
+  "MSFT": {
+    "spotPrice": 42100,
+    "impliedVolatility": 2200,
+    "realizedVolatility": 2150,
+    "surfaceTs": "2026-05-16T09:31:14.000Z"
+  },
+  "GOOGL": {
+    "spotPrice": 17850,
+    "impliedVolatility": 2380,
+    "realizedVolatility": 2260,
+    "surfaceTs": "2026-05-16T09:31:14.000Z"
+  }
+}

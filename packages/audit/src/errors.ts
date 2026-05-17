@@ -15,7 +15,10 @@ import type { AuditError } from "./types.js";
  *
  * The `step` parameter records which writer phase was in flight when the
  * error occurred, so forensic output can pinpoint the failure surface
- * (`s3_put` vs `s3_get` vs `json_parse` vs `validate` vs `canonicalize`).
+ * (`s3_put` vs `s3_get` vs `s3_list` vs `json_parse` vs `validate` vs
+ * `canonicalize`). `step` is plain `string` (not a literal union) so new
+ * phases can be added without touching this signature; the convention is
+ * grep-able.
  *
  * Internal helper. Not exported from the package; consumers see only the
  * `AuditError` shape via the `AppendResult` / `ReadResult` envelopes.

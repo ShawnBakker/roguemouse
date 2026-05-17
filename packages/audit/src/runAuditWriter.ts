@@ -1,5 +1,6 @@
 import {
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   type S3Client,
 } from "@aws-sdk/client-s3";
@@ -11,6 +12,7 @@ import { GENESIS_HASH } from "./genesis.js";
 import type {
   AppendInput,
   AppendResult,
+  ListResult,
   ReadResult,
   RunAuditWriterArgs,
 } from "./types.js";
@@ -51,10 +53,14 @@ function buildKey(runId: string, ts: string, hash: string): string {
  * envelopes (`AppendResult` / `ReadResult`). This is the same
  * envelope-discipline rule as `@roguemouse/inference`.
  *
- * The writer offers no delete or list API. Per spec AC-25 ("On FAIL after a
+ * The writer offers no delete API. Per spec AC-25 ("On FAIL after a
  * successful S3 write, the runner does not delete or modify the written
- * audit record"), this is enforced by construction — the surface area is
- * deliberately limited to append + read.
+ * audit record"), this is enforced by construction.
+ *
+ * Sprint 4b adds `list` (S3 `ListObjectsV2`) to support `audit:search` and
+ * end-to-end chain verification. The method is single-page (no auto-
+ * pagination); callers see `hasMore` and decide whether to re-call with a
+ * narrower prefix.
  */
 export class RunAuditWriter {
   private readonly s3Client: S3Client;
@@ -218,5 +224,50 @@ export class RunAuditWriter {
     }
 
     return { ok: true, data: { key, body, parsed } };
+  }
+
+  /**
+   * List audit object keys under the bucket. Returns a `ListResult`
+   * envelope — never throws. Single-page semantics: one `ListObjectsV2`
+   * call against the chosen prefix, capped at `limit` (default 100).
+   * `hasMore` reflects S3's `IsTruncated` flag; callers paginate by
+   * re-calling with a narrower `runIdPrefix` or accept the partial view.
+   *
+   * `runIdPrefix` is the run UUID (no `audit/` prefix, no trailing
+   * slash). When omitted, the LIST scans the whole `audit/` namespace,
+   * which is appropriate only for ad-hoc diagnostics; production paths
+   * always supply a `runIdPrefix`.
+   */
+  async list(args: {
+    runIdPrefix?: string;
+    limit?: number;
+  }): Promise<ListResult> {
+    const prefix =
+      args.runIdPrefix !== undefined ? `audit/${args.runIdPrefix}/` : "audit/";
+    const maxKeys = args.limit ?? 100;
+    try {
+      const response = await this.s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          MaxKeys: maxKeys,
+        }),
+      );
+      const keys: string[] = [];
+      for (const obj of response.Contents ?? []) {
+        if (typeof obj.Key === "string") {
+          keys.push(obj.Key);
+        }
+      }
+      return {
+        ok: true,
+        data: {
+          keys,
+          hasMore: response.IsTruncated === true,
+        },
+      };
+    } catch (err: unknown) {
+      return { ok: false, error: classifyS3Error(err, "s3_list") };
+    }
   }
 }

@@ -11,6 +11,8 @@ export type {
   AppendInput,
   AppendResult,
   AuditError,
+  ListData,
+  ListResult,
   ReadData,
   ReadResult,
   RunAuditWriterArgs,

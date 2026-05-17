@@ -8,15 +8,24 @@ importers:
 
   .:
     devDependencies:
+      '@roguemouse/agent':
+        specifier: workspace:*
+        version: link:packages/agent
       '@roguemouse/audit':
         specifier: workspace:*
         version: link:packages/audit
       '@roguemouse/inference':
         specifier: workspace:*
         version: link:packages/inference
+      '@roguemouse/runbooks':
+        specifier: workspace:*
+        version: link:packages/runbooks
       '@roguemouse/schemas':
         specifier: workspace:*
         version: link:packages/schemas
+      '@roguemouse/tools':
+        specifier: workspace:*
+        version: link:packages/tools
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
@@ -52,7 +61,20 @@ importers:
         specifier: ^19.0.0
         version: 19.2.3(@types/react@19.2.14)
 
-  packages/agent: {}
+  packages/agent:
+    dependencies:
+      '@roguemouse/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@roguemouse/runbooks':
+        specifier: workspace:*
+        version: link:../runbooks
+      '@roguemouse/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@roguemouse/tools':
+        specifier: workspace:*
+        version: link:../tools
 
   packages/audit:
     dependencies:
@@ -83,7 +105,20 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
-  packages/tools: {}
+  packages/tools:
+    dependencies:
+      '@roguemouse/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@roguemouse/runbooks':
+        specifier: workspace:*
+        version: link:../runbooks
+      '@roguemouse/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
 
 packages:
 

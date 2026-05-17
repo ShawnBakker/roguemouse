@@ -20,12 +20,16 @@
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "lint": "pnpm -r lint",
     "smoke": "tsx scripts/smoke-vultr.ts",
-    "smoke:gemini": "tsx scripts/smoke-gemini.ts"
+    "smoke:gemini": "tsx scripts/smoke-gemini.ts",
+    "smoke:dispatch": "tsx scripts/smoke-dispatch.ts"
   },
   "devDependencies": {
+    "@roguemouse/agent": "workspace:*",
     "@roguemouse/audit": "workspace:*",
     "@roguemouse/inference": "workspace:*",
+    "@roguemouse/runbooks": "workspace:*",
     "@roguemouse/schemas": "workspace:*",
+    "@roguemouse/tools": "workspace:*",
     "@types/node": "^20.0.0",
     "dotenv": "^16.6.1",
     "tsx": "^4.22.0",
