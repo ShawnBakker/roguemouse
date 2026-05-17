@@ -92,3 +92,44 @@ Surfaced during: Sprint 4b Phase 1 deviation 4
 File(s): packages/runbooks/src/loader.ts
 Priority: low
 Surfaced during: Sprint 4b Phase 2 manual verification
+
+---
+
+## 2026-05-17 — Sprint 7 polish: implement real confidence calibration for Risk Officer and Ops Engineer reasoning records
+
+Sprint 4c uses a `5000` placeholder constant for the `confidence` field of `risk_officer:reasoning` and `ops_engineer:reasoning` records (per spec AC-13). The Synthesizer's confidence IS real (model-stated via structured JSON, threshold-checked at 4500 bp, drives proposal-vs-refusal). Only the upstream voices' confidence is stubbed.
+
+Options to consider for Sprint 7:
+- Hedging-token frequency heuristic (count words like "might", "could", "uncertain" against response length)
+- Separate confidence-rating LLM sub-call after each voice's reasoning step
+- Response-structure analysis (presence of caveats, multi-clause hedging)
+
+Real calibration was deliberately deferred to avoid plausibly-wrong heuristics; honest placeholders are better than misleading numbers.
+
+File(s): packages/agent/src/runScenarioA.ts (or wherever Sprint 4c lands the confidence wiring)
+Priority: low (deferred — informational only; not decision-driving)
+Surfaced during: Sprint 4c spec AC-13
+
+---
+
+## 2026-05-17 — Sprint 7 polish: split RunScenarioAArgs.gemini into per-voice client/model pairs
+
+Sprint 7 polish — split `RunScenarioAArgs.gemini` into separate `geminiRisk` and `geminiSynth` client/model pairs so the Synthesizer can use a different Gemini model from the Risk Officer independently. Currently Sprint 4c's orchestrator uses one Gemini client for both voices (the `GEMINI_SYNTH_MODEL` env var is ignored with a warning if it differs from `GEMINI_RISK_MODEL`). This split enables upgrading the Synthesizer to `gemini-2.5-pro` (if billing is enabled) without affecting Risk Officer. Estimated effort: ~15 lines across `runScenarioA.ts` + Phase 7 script + test data updates.
+
+File(s): packages/agent/src/runScenarioA.ts, scripts/scenario-a.ts, packages/agent/src/__tests__/runScenarioA.test.ts
+Priority: low
+Surfaced during: Sprint 4c Phase 7 Deviation 1
+
+---
+
+## 2026-05-18 — Sprint 7 polish: retry-on-empty-response semantics for Vultr Nemotron pre-flight (and consider for voice reasoning calls)
+
+The Vultr Nemotron-Reasoning model's thinking allocation is non-deterministic; occasional `empty_response` at `PREFLIGHT_MAX_TOKENS=2000` is possible even with the post-Phase-8 calibration. A single retry with exponential backoff (e.g., 500ms delay) would handle the variable-thinking-budget tail while preserving hard-fail semantics for genuine 4xx/5xx/network errors.
+
+The same retry pattern could optionally apply to voice reasoning calls in `runScenarioA.ts` (Risk Officer and Ops Engineer), though those calls have larger budgets (4000) and have not yet shown the non-determinism in Phase 8 runs. Pre-flight is the priority.
+
+Empirical Sprint 4c Phase 8 data: `PREFLIGHT_MAX_TOKENS=500` produced `empty_response` on 1/3 trial runs; bumping to 2000 unblocked Phase 8 but doesn't guarantee deterministic behavior under all conditions. A retry would distinguish transient from persistent failures.
+
+File(s): packages/agent/src/preflight.ts, packages/agent/src/__tests__/preflight.test.ts
+Priority: low (deferred; current calibration of 2000 unblocks Sprint 4c)
+Surfaced during: Sprint 4c Phase 8 run #4 pre-flight failure

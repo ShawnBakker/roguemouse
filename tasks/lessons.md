@@ -97,3 +97,38 @@ Detection: How to detect this anti-pattern in code review (grep pattern, specifi
 **Mitigation**: if a comment legitimately needs to reference one of these names, rephrase to avoid the literal parens form. For example, `multiple dispatchTool(...) calls` → `multiple dispatch invocations`. The test is intentionally conservative: it catches real recursion bugs AND benign comment references; both require the author to think before re-introducing the pattern.
 
 **Surfaced during**: Sprint 4b Phase 5 (dispatcher implementation, test case 9 on first run).
+
+---
+
+## 2026-05-18 — Reasoning models consume tokens on internal chain-of-thought; ANY max_tokens budget must accommodate thinking-mode allocation
+
+**Wrong assumption**: A chat-completion budget needs only to cover the visible-output tokens you expect. A 1-2 word probe needs `max_tokens: 10`; a 5-10 sentence reasoning response needs `max_tokens: 1500`.
+
+**Correction**: Reasoning-class models — those whose name carries an explicit "Reasoning" tag (e.g., `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16`), and Gemini's Flash / Pro models with thinking-mode enabled by default — consume substantial tokens on internal chain-of-thought BEFORE emitting visible content. The thinking allocation is invisible in the response body but counts against `max_tokens`. When the budget is exhausted on thinking, the model produces empty content (small-budget case) or truncated content mid-sentence (medium-budget case). Both surface as misleading symptoms — the model looks broken when it's actually running out of budget.
+
+**Empirical data**:
+- Sprint 4a Gemini Flash, 2-3 sentence response prompt: 956 thinking + 40 visible = 996 total tokens
+- Sprint 4c Phase 8 pre-flight at `max_tokens: 10` (Vultr Nemotron-Reasoning): empty `choices[0].message.content`, surfaces as `empty_response` envelope
+- Sprint 4c Phase 8 Risk Officer call at `max_tokens: 1500` (Gemini Flash, 5-10 sentence prompt): 1437 thinking + 59 visible = 1496 total, truncated mid-sentence at `"implies that implied"`. Synthesizer downstream correctly identified `incomplete_voice_input` and refused.
+
+**Where this matters**: every chat-completion call against a reasoning-class model. Specifically (as of Sprint 4c):
+- `packages/agent/src/preflight.ts` (`PREFLIGHT_MAX_TOKENS`)
+- `packages/agent/src/runScenarioA.ts` (`VOICE_MAX_TOKENS`, `SYNTH_MAX_TOKENS`)
+- Any future short-prompt probe or voice-reasoning call
+
+**Detection**: two failure modes from the same root cause:
+1. **Small budget (e.g., 10 tokens)** → 200 OK with empty `choices[0].message.content`. Surfaces as `empty_response` from `@roguemouse/inference`. Looks like a model rotation or auth failure but is actually budget exhaustion.
+2. **Medium budget (e.g., 1500 tokens)** → 200 OK with visible content truncated mid-sentence. Surfaces as a downstream consumer noticing the input is incomplete (Sprint 4c's Synthesizer caught this independently).
+
+To distinguish from genuine empty-response cases (safety blocks, `finish_reason: "content_filter"`): inspect the `usage` field — if `prompt_tokens + completion_tokens` is meaningfully less than `total_tokens`, the gap is thinking allocation.
+
+**Mitigation** (recommended budgets for reasoning-class models, post-Phase-8 empirical calibration):
+- **Pre-flight / trivial probes**: `max_tokens >= 2000`. Initial recommendation of 500 (based on Sprint 2's `DEFAULT_MAX_TOKENS`) was overconfident; Vultr Nemotron-Reasoning's thinking allocation is **non-deterministic** — `PREFLIGHT_MAX_TOKENS = 500` produced `empty_response` 1 out of 3 trial runs in Phase 8 (passed for runs #2/3, failed for run #4 with identical code). 2000 should be deterministic for a trivial "ok" probe. Cost ~$0.0008 per pre-flight, still negligible.
+- **Voice-reasoning calls (5-10 sentences)**: `max_tokens >= 4000`. Cost ~$0.0005-0.001 per call. Gemini Flash supports up to 8192 output tokens.
+- **Structured-output calls (Synthesizer JSON)**: `max_tokens >= 4000`. Symmetric with voice-reasoning. Structured JSON output is roughly 2-3x more token-heavy than free-text for equivalent semantic content — field names, quoting, nested-array brackets all consume budget on top of the actual semantic content. Empirical from Sprint 4c Phase 8 run #2: the Synthesizer at the old 2000 cap used 1322 thinking + 663 visible JSON output and truncated mid-`supporting_evidence` array, surfacing as `synthesizer_malformed_response` (runId `67b83222-0063-4d0e-a9ff-eab3068eab71`).
+
+**Open question for Sprint 7**: should pre-flight probes implement retry-on-empty-response semantics? The current hard-fail behavior catches genuine catalog/auth failures correctly but treats variable thinking allocation as a hard failure. A single retry with backoff would distinguish a transient empty-response from a persistent one. See `tasks/todo.md` 2026-05-18 entry.
+
+**Surfaced during**: Sprint 4c Phase 8, two consecutive live `pnpm scenario:a` runs.
+- RunId `0cf453c1-3afa-4a7f-8ae9-70850ffc9581`: pre-flight aborted at `max_tokens: 10`, no audit records written.
+- RunId `584a753d-21bb-4096-9dd7-d0830659f2a6`: Risk Officer truncated at `max_tokens: 1500`, Synthesizer refused with `reasonCode: "incomplete_voice_input"`. 15 audit records written (legitimate refusal terminal).
