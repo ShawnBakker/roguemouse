@@ -78,3 +78,22 @@ Detection: How to detect this anti-pattern in code review (grep pattern, specifi
 - (b) Use `gemini-2.5-flash` (non-zero free-tier quota; works as a capable Risk Officer / Synthesizer model). Sprint 4a chose this path. Sprint 7 polish may revisit (a) for demo-time Pro upgrade.
 
 **Surfaced during**: Sprint 4a Phase 4 (Gemini integration smoke test).
+
+---
+
+## 2026-05-17 — Dispatcher recursion-guard test uses literal regex against source; comments cannot use the guarded patterns
+
+**Wrong assumption**: The architectural recursion-guard test in `packages/agent/src/__tests__/dispatcher.test.ts` (which reads `dispatcher.ts` and counts literal pattern matches) was assumed to behave correctly regardless of where the patterns appeared — as long as they did not appear in executable code, the count would be zero.
+
+**Correction**: The test uses plain regex matching against the raw file contents (`readFileSync` + `match`). It does NOT strip comments or JSDoc. A reference to the guarded patterns inside a comment will count toward the assertion, failing the test as if a recursion bug were present. This was discovered when the dispatcher's JSDoc contained the phrase `multiple dispatchTool(...) calls in parallel` and the test's `dispatchTool(` count was 1 instead of 0.
+
+**Where this matters**: any source file with an architectural-grep test, currently `packages/agent/src/dispatcher.ts`. The guarded patterns are:
+- `ctx.writer.append(` — must appear EXACTLY 2 times (the two tool-flow audit writes)
+- `"audit:append"` — must appear 0 times (no string-literal reference)
+- `dispatchTool(` — must appear 0 times (the function is defined, not called recursively from within itself)
+
+**Detection**: if a future change to `dispatcher.ts` introduces any of these patterns — in a comment, JSDoc, type annotation, or actual code — the recursion-guard test fails. To audit, run `pnpm --filter @roguemouse/agent test` and check whether the architectural-guard suite passes.
+
+**Mitigation**: if a comment legitimately needs to reference one of these names, rephrase to avoid the literal parens form. For example, `multiple dispatchTool(...) calls` → `multiple dispatch invocations`. The test is intentionally conservative: it catches real recursion bugs AND benign comment references; both require the author to think before re-introducing the pattern.
+
+**Surfaced during**: Sprint 4b Phase 5 (dispatcher implementation, test case 9 on first run).

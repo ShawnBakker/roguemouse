@@ -2,8 +2,8 @@
 
 This file is the canonical state of the project. **Update it whenever state changes.** It is read at every session start.
 
-**Last updated**: 2026-05-16
-**Current sprint**: Sprint 4b — dispatchTool runtime + 8 tool implementations + RAG (about to start)
+**Last updated**: 2026-05-17
+**Current sprint**: Sprint 4c — Scenario A: Stale IV Surface (queued; 4b complete)
 
 ---
 
@@ -107,6 +107,12 @@ Division of labor:
 - **Gemini model selection for Sprint 4 family**: Risk Officer voice uses `gemini-2.5-flash` (Sprint 4a verified); Synthesizer voice uses `gemini-2.5-flash` (Sprint 4c, planned). Pro 2.5 was the original target but free-tier quota = 0 forced the pivot. Sprint 7 polish may upgrade Risk Officer to Pro 2.5 IF billing is enabled on the Google Cloud project before the demo. Decision date: Sprint 4a Phase 4 (2026-05-16). Captured in `tasks/lessons.md`.
 - **Cross-provider envelope discipline validated through symmetric classifier extraction**: One wrapped chat-completion function shape serves both Vultr Nemotron (Sprint 2) and Gemini (Sprint 4a) by going through the openai SDK pointed at different baseURLs. The error classifier (`classifyInferenceError`) was extracted from `chatCompletion.ts` (file-local) to `packages/inference/src/errors.ts` (package-internal, mirrors `packages/audit/src/errors.ts`'s `classifyS3Error` precedent) so both provider wrappers can share it. Established in Sprint 4a Phase 2. Rationale: any third LLM provider that goes through the openai SDK (which Gemini uses, and several others do too) reuses this classifier without modification. The envelope shape (`{ok: true, data, usage?} | {ok: false, error: {code, message, retryable, step?}}`) is now the cross-package standard across `@roguemouse/inference` and `@roguemouse/audit`.
 - **Errors-module pattern: provider-internal HTTP/network error classifier in a dedicated file**: Two instances of the pattern now exist — `packages/audit/src/errors.ts` (`classifyS3Error`, Sprint 2) and `packages/inference/src/errors.ts` (`classifyInferenceError`, Sprint 4a). The shape is consistent: a classifier function that translates SDK-specific exceptions into the package's structured error envelope; the classifier is package-internal (not exported from the barrel); JSDoc cross-references the other instance. Pattern is now established for any future I/O package.
+- **dispatchTool runtime as createDispatcher factory in @roguemouse/agent + TOOL_IMPLEMENTATIONS static registry in @roguemouse/tools**: The factory takes `{ writer, fixtures, runbookIndex }` and returns a `DispatchTool` function closed over a `ToolCtx`. The registry is a static object keyed by the 8 locked tool names; the `satisfies ToolImplementationsRegistry` mapped-type clause enforces per-name implementation coverage at compile time (a missing or wrong-signature impl is a TS error at the registry declaration). Established in Sprint 4b Phase 4-5. Rationale: registry is the type-safety hub; the dispatcher is the runtime hub; Sprint 4c's planner is a consumer with no responsibility for tool wiring.
+- **Serial dispatch via promise-chain mutex (Decision 1A locked)**: The dispatcher serializes tool invocations via a per-instance promise chain. Concurrent `dispatchTool(...)` calls produce records in strict invocation order. Established in Sprint 4b Phase 5. Rationale: correctness-first risk management in the highest-risk sprint; chain ordering is deterministic without queue complexity. Empirical S3 PUT overhead is ~300ms per dispatch (2 writes); Sprint 7 polish entry filed for queued parallel if Sprint 4c reveals demo-time latency cost (runId 2bae8eaa-1553-4d5a-bd02-8f15a3cb82db for reference).
+- **ToolCtx single-shape DI pattern**: `ToolCtx = { writer: RunAuditWriter; fixtures: ScenarioAFixtures; runbookIndex: RunbookIndex }`. Every tool implementation receives the full ctx and destructures locally. Established in Sprint 4b Phase 4. Rationale: tools cannot accidentally rely on hidden module-level state; tests inject a fresh ctx; dispatcher's recursion guard depends on the writer being a known field of the same ctx.
+- **Application-layer RAG via keyword + frequency**: Tokenize lowercased input on locked punctuation regex, filter against a locked 20-word stopword set, build a per-document frequency map, score queries via summed term-frequencies normalized by document total tokens. `relevanceScore` in basis points 0-10000. "When this fires" paragraph extracted via regex as a per-document precomputed excerpt. Established in Sprint 4b Phase 2. Rationale: simplest viable implementation; zero new dependencies; portable across LLM providers; empirically returns `iv-rv-divergence.md` at rank 1 with 4× margin for the Scenario A query. Vector-DB upgrade is a Sprint 7 polish entry, deferred until ranking shortcomings are observed in practice.
+- **writer.list method on RunAuditWriter (single-page semantics)**: Added in Sprint 4b Phase 3. Signature: `list({ runIdPrefix?, limit? }): Promise<ListResult>`. `ListResult` envelope follows the same discipline as `AppendResult` / `ReadResult`. `hasMore` mirrors S3's `IsTruncated`; no auto-pagination. Rationale: `audit:search` tool needs LIST; chain verification needs LIST; no use case so far requires multi-page semantics inside the writer.
+- **Recursion guard enforced at three layers**: (a) architectural — dispatcher writes `tool:call` / `tool:result` records via `writer.append` directly, not through `dispatchTool("audit:append", ...)`; (b) source-textual — `packages/agent/src/__tests__/dispatcher.test.ts` greps `dispatcher.ts` for `ctx.writer.append(` (exactly 2), `"audit:append"` (0), `dispatchTool(` (0); (c) runtime — `audit:append` tool's `RESERVED_RECORDTYPES` guard rejects `tool:call` / `tool:result` recordTypes with the `recordtype_reserved_for_dispatcher` error code before touching the writer. Triple-layered protection for the load-bearing invariant. Established in Sprint 4b Phase 4-5.
 
 ## Architectural decisions deferred
 
@@ -151,6 +157,16 @@ audit/0ca812ef-3214-4e98-ad43-9b1fddbdd4aa/2026-05-16T21-42-34.772Z-a02091694720
 ```
 
 Bucket: `roguemouse-audit-log`, region `ams1`. Run ID: `0ca812ef-3214-4e98-ad43-9b1fddbdd4aa`. Record hash: `a02091694720ccd80831f2283315a1ee89c1efa07eb47635d4ab225f2a9303dc`. Model used: `gemini-2.5-flash` (env-driven pivot from `gemini-2.5-pro` due to free-tier quota; documented in `tasks/lessons.md`). Token usage: 49 prompt / 40 completion / 1045 total (the 956-token gap is Flash's thinking-mode allocation, enabled by default through the OpenAI-compat endpoint). This is the third audit record overall in the bucket AND the first-ever `risk_officer:reasoning` record — the first of 12 locked recordType branches from Sprint 3 to be exercised end-to-end.
+
+### Fourth audit run / Sprint 4b multi-record verification artifact (Sprint 4b Phase 6, 2026-05-17T03:36:34 UTC)
+
+S3 key prefix:
+
+```
+audit/2bae8eaa-1553-4d5a-bd02-8f15a3cb82db/
+```
+
+Bucket: `roguemouse-audit-log`, region `ams1`. Run ID: `2bae8eaa-1553-4d5a-bd02-8f15a3cb82db`. Record count: **7** (1 `anomaly:detected` + 3 `tool:call`/`tool:result` pairs). First record's `previousHash` is the genesis hash. Final hash: `01ec04455e4efa24afb799fc0e37cc8c3506d12030373738fe12cd2ad36ee46a`. First key: `audit/2bae8eaa-.../2026-05-17T03-36-34.312Z-aab10852...json`. Last key: `audit/2bae8eaa-.../2026-05-17T03-36-36.716Z-01ec0445...json`. Tool dispatches: `market_data:lookup` AAPL → `position:snapshot {}` → `runbook:search` (Sprint 4a smoke prompt, topK=3). RAG result: `iv-rv-divergence.md` at rank 1 with relevanceScore 476. Significance: **first multi-record chain in the project**; exercises three new recordTypes (`anomaly:detected`, `tool:call`, `tool:result`), bringing the total to **5 of 12** locked recordType branches exercised end-to-end. Chain integrity verified end-to-end via the smoke's read-back loop; no chain breaks.
 
 ## Sprint status
 
@@ -230,15 +246,32 @@ Bucket: `roguemouse-audit-log`, region `ams1`. Run ID: `0ca812ef-3214-4e98-ad43-
 - 12 files changed, 2,214 insertions, 72 deletions
 - No new dependencies (Decision 1B held)
 
-#### Sprint 4b — dispatchTool runtime + 8 tool implementations + RAG ⏳ Next
+#### Sprint 4b — dispatchTool runtime + 8 tool implementations + RAG ✅ Complete (2026-05-17)
 - Goals 2, 3, and 6 of the original Sprint 4 plan
-- Implements the 8 tool schemas locked in Sprint 3: `market_data:lookup`, `runbook:search`, `position:snapshot`, `broker:reconcile`, `audit:append`, `audit:search`, `score:explain`, `policy:check`
-- Implements the `dispatchTool<TName>(name, args)` runtime in `@roguemouse/agent` (Sprint 3 locked the type signature; this sprint provides behavior)
-- Implements application-layer RAG over the runbook corpus (5 runbooks landed in 0e7681b, used by `runbook:search` tool)
-- Estimated scope: large; Sunday's work, possibly into Monday morning
-- Key open questions for brainstorm: which tools are dispatched in parallel vs serial; how the dispatch logs `tool:call` and `tool:result` audit records without recursing into `audit:append`; how RAG retrieval is implemented (in-memory keyword match for the hackathon; vector DB deferred to post-submission)
+- Full 5-stage workflow (third full exercise of the protocol): brainstorm → spec → plan → implement (6 phases) → review
+- 44 acceptance criteria all PASS, verified against on-disk code + live Phase 6 smoke + 230-test workspace test suite
+- Live Phase 6 smoke run against real Vultr: exit 0, 4872ms total, 7 records written across one runId, chain integrity verified end-to-end
+- Implements the 8 tool schemas locked in Sprint 3: `market_data:lookup`, `runbook:search`, `position:snapshot`, `broker:reconcile`, `audit:append`, `audit:search`, `score:explain`, `policy:check` (tools 1-6 production-quality, tools 7-8 deterministic stubs adequate for schema parity)
+- Implements the `dispatchTool<TName>(name, args)` runtime in `@roguemouse/agent` via `createDispatcher` factory; mapped-type `TOOL_IMPLEMENTATIONS` static registry in `@roguemouse/tools` with `satisfies` clause enforces per-name coverage at compile time
+- Application-layer RAG over the runbook corpus: keyword + frequency tokenization, locked 20-word stopword filter, "When this fires" excerpt extraction; empirically returns `iv-rv-divergence.md` at rank 1 with 4× margin for the Scenario A query
+- `RunAuditWriter.list` method added (single-page semantics) supporting `audit:search` + smoke's chain verification
+- Recursion guard enforced at three layers (architectural / source-textual / runtime)
+- Locked artifacts (inherited by Sprint 4c+):
+  - `createDispatcher({ writer, fixtures, runbookIndex })` factory returning a serial `DispatchTool`
+  - `ToolCtx = { writer, fixtures, runbookIndex }` single-shape DI for all tool implementations
+  - `TOOL_IMPLEMENTATIONS: ToolImplementationsRegistry` static registry (mapped type enforces coverage)
+  - `RunbookIndex` keyword index built once at boot via `loadRunbookCorpus + buildSearchIndex`
+  - `ScenarioAFixtures` loaded once at boot via `loadScenarioA(rootDir)`
+  - `writer.list({runIdPrefix?, limit?})` returning `ListResult` envelope (step: `s3_list`)
+  - `RESERVED_RECORDTYPES` runtime guard inside `audit:append` rejecting `tool:call` / `tool:result`
+  - First multi-record chain runId: `2bae8eaa-1553-4d5a-bd02-8f15a3cb82db` (7 records, pinned in Artifacts)
+- Sprint 4b lesson surfaced: dispatcher recursion-guard test uses literal regex against source (no comment stripping). Comments referencing the guarded patterns will fail the test as if a real recursion bug were present. Documented in `tasks/lessons.md`.
+- Six consecutive first-try phase PASSes (Phases 1-6); 33 deviations total, all approved (schema corrections, structural improvements over plan pseudocode, dev-tooling discipline, test-design choices, implementation discoveries that revised the plan, test-defense improvements, cleanup discipline)
+- 35 files created across `packages/agent`, `packages/audit`, `packages/runbooks`, `packages/tools`, plus `fixtures/`, `scripts/`, and `docs/sprints/dispatch-runtime-tools-rag/`; 5 files modified
+- Documentation: docs/sprints/dispatch-runtime-tools-rag/{brainstorm,spec,plan,review}.md
+- No new external dependencies (only existing deps + workspace deps)
 
-#### Sprint 4c — Scenario A: Stale IV Surface ⏳ Queued
+#### Sprint 4c — Scenario A: Stale IV Surface ⏳ Next
 - Goals 4 and 5 of the original Sprint 4 plan
 - Multi-agent debate runtime: Risk Officer voice (`gemini-2.5-flash`) + Ops Engineer voice (Vultr Nemotron) + Synthesizer voice (`gemini-2.5-flash`)
 - End-to-end scenario assembly: anomaly detection → tool invocation → multi-agent debate → proposal/refusal output → multi-record audit chain

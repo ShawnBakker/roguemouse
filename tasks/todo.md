@@ -49,3 +49,46 @@ The rolled-own canonicalizer at `packages/audit/src/canonicalize.ts` handles JSO
 File(s): packages/audit/src/canonicalize.ts, packages/schemas/src/canonicalSafe.ts
 Priority: low (deferred — no current trigger)
 Surfaced during: Sprint 2 brainstorm decision 3, locked at /spec-task
+
+---
+
+## 2026-05-17 — Sprint 7 polish: consider parallel tool dispatch with audit-write queue
+
+Sprint 4b's dispatcher is serial: each `dispatchTool` call writes `tool:call` → executes body → writes `tool:result` before the next call begins. Sprint 4b's brainstorm Decision 1 considered a queued-parallel alternative (~40-line FIFO queue helper, ~2× latency improvement for 3-tool fan-out) but kept serial for correctness-first risk management in the highest-risk sprint.
+
+If Sprint 4c reveals that the planner fans out reads (e.g., the Risk Officer voice calls 3 tools at the start of a debate step) and the resulting demo-time latency is visibly slow (~30-60 second runs are the worry), Sprint 7 polish should add the queue.
+
+Implementation reference: `docs/sprints/dispatch-runtime-tools-rag/brainstorm.md` Decision 1, Approach 1B. The queue is a per-writer FIFO that serializes `safeParse → canonicalize → hash → S3 PUT` cycles while letting tool bodies execute in parallel via `Promise.all`. Chain ordering is preserved deterministically.
+
+Trigger conditions:
+- Sprint 4c's planner produces measurable fan-out latency (>5 seconds wall-clock spent on serial S3 PUTs).
+- Demo viewers visibly wait during a scenario run.
+- A Sprint 4b retrospective identifies serial dispatch as the bottleneck.
+
+If none of the above is observed, leave the dispatcher serial.
+
+**Empirical data from Sprint 4b Phase 6 smoke (2026-05-17)**: serial dispatch costs ~300ms per S3 round trip (2 writes per dispatch). For Sprint 4c's ~120-record Scenario A run, this compounds to ~36 seconds of S3 overhead alone. Queued parallel would shave significantly. If Sprint 4c's demo latency is visibly slow, this becomes a viable Sprint 7 priority. RunId for reference: 2bae8eaa-1553-4d5a-bd02-8f15a3cb82db.
+
+File(s): packages/agent/src/dispatcher.ts
+Priority: low (deferred — no current trigger, but easy to add if needed)
+Surfaced during: Sprint 4b brainstorm Decision 1 (operator kept 1A over my reversal to 1B)
+
+---
+
+## 2026-05-17 — Audit shared primitives in @roguemouse/schemas for promotion to public barrel exports
+
+As more code outside the schemas package needs internal constants (`ISO_TIMESTAMP_MS_REGEX` is the first; Sprint 4b's fixture loader in `packages/tools/src/fixtures/scenarioASchema.ts` currently duplicates it as a 1-line constant), the duplication-vs-public-API trade tilts toward making `primitives.ts` constants public via the schemas barrel. Candidates: `ISO_TIMESTAMP_MS_REGEX`, `HEX_64_REGEX`, `TOOL_NAME_LITERALS`. Sprint 7 polish or post-submission.
+
+File(s): packages/schemas/src/index.ts, packages/schemas/src/primitives.ts
+Priority: low
+Surfaced during: Sprint 4b Phase 1 deviation 4
+
+---
+
+## 2026-05-17 — Normalize runbook paths to POSIX-style forward slashes
+
+`loadRunbookCorpus` currently returns paths built via `path.join`, which produces Windows-style backslashes on Windows hosts (e.g., `packages\\runbooks\\content\\iv-rv-divergence.md`). Functional on the dev host but inconsistent across platforms. The path is informational only (not used as a programmatic identifier or filesystem key), so impact is cosmetic. Switching to `path.posix.join` or a final `replaceAll("\\", "/")` would normalize. Sprint 7 polish or post-submission.
+
+File(s): packages/runbooks/src/loader.ts
+Priority: low
+Surfaced during: Sprint 4b Phase 2 manual verification
