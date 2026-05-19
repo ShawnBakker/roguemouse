@@ -1,0 +1,39 @@
+# Build artifacts (we rebuild inside the image)
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/tsconfig.tsbuildinfo
+
+# Local environment secrets — NEVER bake these into the image.
+# Coolify injects env vars at runtime via the container environment.
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Source control
+.git
+.gitignore
+
+# Editor / OS
+.DS_Store
+.vscode
+.idea
+
+# Documentation and tooling (not needed at runtime)
+docs
+README.md
+LICENSE
+
+# One-off scripts (underscore-prefixed temporary probes)
+scripts/_*
+
+# Tests (not needed at runtime)
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
