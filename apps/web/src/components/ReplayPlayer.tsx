@@ -18,7 +18,6 @@ export function ReplayPlayer({ items }: { items: readonly ReplayItem[] }) {
   const [revealed, setRevealed] = useState<number>(total > 0 ? 1 : 0);
   const [playing, setPlaying] = useState<boolean>(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!playing) return;
@@ -33,10 +32,6 @@ export function ReplayPlayer({ items }: { items: readonly ReplayItem[] }) {
       }
     };
   }, [playing, revealed, total]);
-
-  useEffect(() => {
-    latestRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [revealed]);
 
   const done = revealed >= total;
   const elapsedSeconds = Math.min(revealed, total) * (STEP_MS / 1000) - (STEP_MS / 1000);
@@ -93,7 +88,6 @@ export function ReplayPlayer({ items }: { items: readonly ReplayItem[] }) {
         {items.slice(0, revealed).map((item, i) => (
           <div
             key={item.key}
-            ref={i === revealed - 1 ? latestRef : undefined}
             className="animate-in fade-in slide-in-from-bottom-2 duration-300"
           >
             <RecordCard
