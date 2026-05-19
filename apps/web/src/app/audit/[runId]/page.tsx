@@ -1,8 +1,11 @@
 import Link from "next/link";
 
-import { GenesisBanner } from "@/components/ChainVisualization";
+import { GENESIS_HASH } from "@roguemouse/audit";
+
+import { ChainLink, GenesisBanner } from "@/components/ChainVisualization";
 import { RecordCard } from "@/components/RecordCard";
 import { TerminalDispositionCard } from "@/components/TerminalDispositionCard";
+import { VerifyChainButton, type VerifyItem } from "@/components/VerifyChainButton";
 import { readRun } from "@/lib/bucketReader";
 
 export const dynamic = "force-dynamic";
@@ -75,21 +78,35 @@ export default async function AuditRun({
           Number.isFinite(startMs) && Number.isFinite(endMs)
             ? (endMs - startMs) / 1000
             : null;
+        const items: VerifyItem[] = records.map((r) => ({
+          record: r.record,
+          hash: hashFromKey(r.key),
+        }));
         return (
           <div className="space-y-3">
             <TerminalDispositionCard
               record={last.record}
               elapsedSeconds={elapsedSeconds}
             />
-            <GenesisBanner previousHash={first.record.previousHash} />
-            {records.map((item, i) => (
-              <RecordCard
-                key={item.key}
-                record={item.record}
-                ordinal={i + 1}
-                currentHash={hashFromKey(item.key)}
-              />
-            ))}
+            <VerifyChainButton items={items} genesisHash={GENESIS_HASH} />
+            <GenesisBanner
+              previousHash={first.record.previousHash}
+              genesisHash={GENESIS_HASH}
+            />
+            {records.map((item, i) => {
+              const hash = hashFromKey(item.key);
+              const isLast = i === records.length - 1;
+              return (
+                <div key={item.key} className="space-y-0">
+                  <RecordCard
+                    record={item.record}
+                    ordinal={i + 1}
+                    currentHash={hash}
+                  />
+                  {!isLast ? <ChainLink hash={hash} /> : null}
+                </div>
+              );
+            })}
           </div>
         );
       })()}
