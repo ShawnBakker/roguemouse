@@ -53,6 +53,24 @@ importers:
       '@radix-ui/react-tabs':
         specifier: ^1.1.13
         version: 1.1.13(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@roguemouse/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
+      '@roguemouse/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
+      '@roguemouse/inference':
+        specifier: workspace:*
+        version: link:../../packages/inference
+      '@roguemouse/runbooks':
+        specifier: workspace:*
+        version: link:../../packages/runbooks
+      '@roguemouse/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
+      '@roguemouse/tools':
+        specifier: workspace:*
+        version: link:../../packages/tools
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

@@ -1,0 +1,125 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+
+type ScenarioResponse =
+  | { ok: true; runId: string; recordCount: number; terminalRecordType: string }
+  | { ok: false; error: { code: string; message: string } };
+
+function messageFor(elapsedMs: number): string {
+  const s = elapsedMs / 1000;
+  if (s < 5) return "Detecting anomaly…";
+  if (s < 15) return "Risk Officer reasoning…";
+  if (s < 22) return "Ops Engineer dispatching tools…";
+  if (s < 30) return "Synthesizer reconciling perspectives…";
+  return "Almost done…";
+}
+
+export function TriggerButton({
+  alreadyTriggered,
+  triggeredRunId,
+}: {
+  alreadyTriggered: boolean;
+  triggeredRunId: string | null;
+}) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "running" | "error">("idle");
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (state !== "running") return;
+    const start = Date.now();
+    tickRef.current = setInterval(() => {
+      setElapsedMs(Date.now() - start);
+    }, 250);
+    return () => {
+      if (tickRef.current !== null) {
+        clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+    };
+  }, [state]);
+
+  async function onClick() {
+    if (state === "running" || alreadyTriggered) return;
+    setErrorMsg(null);
+    setElapsedMs(0);
+    setState("running");
+    try {
+      const res = await fetch("/api/scenario", { method: "POST" });
+      const data = (await res.json()) as ScenarioResponse;
+      if (!res.ok || !data.ok) {
+        const msg = data.ok ? `HTTP ${res.status}` : data.error.message;
+        setErrorMsg(msg);
+        setState("error");
+        return;
+      }
+      router.push(`/audit/${data.runId}`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
+      setState("error");
+    }
+  }
+
+  const disabled = alreadyTriggered || state === "running";
+
+  return (
+    <div className="space-y-3">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="w-full px-6 py-4 text-h3 border transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+        style={{
+          backgroundColor: disabled ? "var(--color-faint)" : "var(--color-ink)",
+          color: disabled ? "var(--color-muted)" : "var(--color-bg)",
+          borderColor: disabled ? "var(--color-rule)" : "var(--color-ink)",
+        }}
+      >
+        {state === "running"
+          ? messageFor(elapsedMs)
+          : alreadyTriggered
+            ? "Already triggered"
+            : "Trigger live run"}
+      </button>
+
+      {state === "running" ? (
+        <p className="mono text-caption" style={{ color: "var(--color-muted)" }}>
+          elapsed {(elapsedMs / 1000).toFixed(1)}s · expect ~30s · writes ~15
+          records to the audit log
+        </p>
+      ) : null}
+
+      {alreadyTriggered && triggeredRunId !== null ? (
+        <p className="text-small" style={{ color: "var(--color-muted)" }}>
+          This browser session already triggered{" "}
+          <a
+            href={`/audit/${triggeredRunId}`}
+            className="underline"
+            style={{ color: "var(--color-ink)" }}
+          >
+            {triggeredRunId.slice(0, 8)}…
+          </a>
+          . Open a fresh browser to trigger another.
+        </p>
+      ) : null}
+
+      {state === "error" && errorMsg !== null ? (
+        <div
+          className="p-3 border text-small"
+          style={{
+            backgroundColor: "var(--color-anomaly-dim)",
+            borderColor: "var(--color-anomaly-border)",
+            color: "var(--color-anomaly)",
+          }}
+        >
+          <strong className="text-label">scenario failed</strong>
+          <p className="mono text-caption mt-1">{errorMsg}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
