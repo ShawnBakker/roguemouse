@@ -116,22 +116,27 @@ export default async function Home({
               elapsedSeconds={canonical.totalElapsedMs / 1000}
             />
           ) : null}
-          <ReplayPlayer items={replay.items} />
+
+          <section className="space-y-3">
+            <p className="text-label">Try your own</p>
+            <p className="text-small" style={{ color: "var(--color-muted)" }}>
+              Pick a ticker. The agent reasons about your symbol against the
+              same synthetic IV/RV anomaly pattern the canonical run
+              demonstrates, producing a fresh 15-record audit chain rooted at
+              genesis.
+            </p>
+            <TriggerButton
+              alreadyTriggered={triggered}
+              triggeredRunId={triggeredRunId}
+            />
+          </section>
+
+          <section className="space-y-3">
+            <p className="text-label">Canonical replay</p>
+            <ReplayPlayer items={replay.items} />
+          </section>
         </>
       )}
-
-      <section className="space-y-3">
-        <p className="text-label">Try your own</p>
-        <p className="text-small" style={{ color: "var(--color-muted)" }}>
-          Pick a ticker. The agent reasons about your symbol against the same
-          synthetic IV/RV anomaly pattern the canonical run above demonstrates,
-          producing a fresh 15-record audit chain rooted at genesis.
-        </p>
-        <TriggerButton
-          alreadyTriggered={triggered}
-          triggeredRunId={triggeredRunId}
-        />
-      </section>
 
       <footer
         className="pt-6 border-t flex flex-wrap items-center justify-between gap-3 text-small"
