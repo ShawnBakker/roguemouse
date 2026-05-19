@@ -153,6 +153,10 @@ vite.config.ts.timestamp-*
 !.claude/rules/
 !.claude/rules/*.md
 
+# Claude Code harness runtime files (not part of the workflow scaffolding)
+.claude/scheduled_tasks.lock
+.claude/*.local.*
+
 # Explicitly allow task tracking
 !tasks/
 !tasks/*.md
