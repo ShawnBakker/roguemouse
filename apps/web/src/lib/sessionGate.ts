@@ -37,3 +37,10 @@ export function markTriggered(sessionId: string, runId: string): void {
 export function getTriggeredRunId(sessionId: string): string | null {
   return triggered.get(sessionId) ?? null;
 }
+
+export async function clearSession(): Promise<void> {
+  const store = await cookies();
+  const existing = store.get(SESSION_COOKIE)?.value;
+  if (existing) triggered.delete(existing);
+  store.delete(SESSION_COOKIE);
+}

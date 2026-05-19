@@ -41,7 +41,21 @@ export function TriggerButton({
   const [elapsedMs, setElapsedMs] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submittedSymbol, setSubmittedSymbol] = useState<string>("AAPL");
+  const [resetting, setResetting] = useState(false);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function onResetClick() {
+    if (resetting) return;
+    setResetting(true);
+    try {
+      const res = await fetch("/api/session/reset", { method: "POST" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      window.location.reload();
+    } catch (err) {
+      console.error("session reset failed:", err);
+      setResetting(false);
+    }
+  }
 
   useEffect(() => {
     if (state !== "running") return;
@@ -166,6 +180,26 @@ export function TriggerButton({
           </a>
           . Open a fresh browser to trigger another.
         </p>
+      ) : null}
+
+      {alreadyTriggered ? (
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={onResetClick}
+            disabled={resetting}
+            className="text-small underline hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ color: "var(--color-muted)" }}
+          >
+            {resetting ? "Resetting…" : "Reset session"}
+          </button>
+          <p
+            className="text-caption mt-1"
+            style={{ color: "var(--color-muted)" }}
+          >
+            Clears the cookie gate for a fresh run.
+          </p>
+        </div>
       ) : null}
 
       {state === "error" && errorMsg !== null ? (
