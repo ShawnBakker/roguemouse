@@ -28,8 +28,13 @@
  *
  * Browser-side reuse decisions:
  *   - canonicalize  → reused from @roguemouse/schemas (pure JS).
- *   - sha256        → Node-only in the writer; replaced here with Web
- *                     Crypto's crypto.subtle.digest('SHA-256', ...).
+ *   - sha256        → Node-only in the writer; replaced here with the
+ *                     js-sha256 library (pure-JS, no Web Crypto dependency).
+ *                     Web Crypto's crypto.subtle is gated to secure contexts
+ *                     per W3C spec § 1.4; production runs over HTTP on
+ *                     sslip.io (Let's Encrypt rate-limit deviation from
+ *                     Phase 4) so crypto.subtle is undefined there. js-sha256
+ *                     works in any context.
  *   - GENESIS_HASH  → Node-only in @roguemouse/audit (uses node:crypto);
  *                     passed in as a prop from the server component.
  *
@@ -37,9 +42,12 @@
  * canonical runs to mis-verify. The pinned canonical runs (Sprint 4c's
  * cfbafd8c-... clean and 381dd171-... degraded) are the regression
  * fixtures: if they ever fail this verifier, this file (or canonicalize)
- * is out of sync with the writer.
+ * is out of sync with the writer. The offline verifier
+ * (scripts/verify-chain-offline.ts) uses node:crypto's webcrypto and is
+ * the protocol-parity ground truth.
  */
 
+import { sha256 } from "js-sha256";
 import { useState } from "react";
 
 import { canonicalize, type AuditRecordBody } from "@roguemouse/schemas";
@@ -59,15 +67,8 @@ type Verdict =
   | { state: "passed"; checked: number }
   | { state: "failed"; failedIndex: number; reason: RecordVerdict };
 
-async function sha256Hex(text: string): Promise<string> {
-  const buf = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest("SHA-256", buf);
-  const bytes = new Uint8Array(digest);
-  let out = "";
-  for (const b of bytes) {
-    out += b.toString(16).padStart(2, "0");
-  }
-  return out;
+function sha256Hex(text: string): string {
+  return sha256(text);
 }
 
 async function verifyRecord(
@@ -91,7 +92,7 @@ async function verifyRecord(
       detail: `canonicalize threw: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
-  const computedHash = await sha256Hex(canonical);
+  const computedHash = sha256Hex(canonical);
   if (computedHash !== item.hash) {
     return {
       ok: false,
@@ -189,7 +190,7 @@ export function VerifyChainButton({
       >
         <span>{face.label}</span>
         <span className="mono text-caption" style={{ color: face.fg, opacity: 0.7 }}>
-          {verdict.state === "idle" ? "SHA-256 · Web Crypto" : null}
+          {verdict.state === "idle" ? "SHA-256 · client-side" : null}
         </span>
       </button>
       {verdict.state === "failed" && !verdict.reason.ok ? (
