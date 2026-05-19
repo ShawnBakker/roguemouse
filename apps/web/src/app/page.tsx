@@ -121,7 +121,12 @@ export default async function Home({
       )}
 
       <section className="space-y-3">
-        <p className="text-label">try a live run</p>
+        <p className="text-label">Try your own</p>
+        <p className="text-small" style={{ color: "var(--color-muted)" }}>
+          Pick a ticker. The agent reasons about your symbol against the same
+          synthetic IV/RV anomaly pattern the canonical run above demonstrates,
+          producing a fresh 15-record audit chain rooted at genesis.
+        </p>
         <TriggerButton
           alreadyTriggered={triggered}
           triggeredRunId={triggeredRunId}

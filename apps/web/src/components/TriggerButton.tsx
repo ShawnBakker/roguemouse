@@ -4,12 +4,24 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type ScenarioResponse =
-  | { ok: true; runId: string; recordCount: number; terminalRecordType: string }
+  | {
+      ok: true;
+      runId: string;
+      recordCount: number;
+      terminalRecordType: string;
+      symbol?: string;
+    }
   | { ok: false; error: { code: string; message: string } };
 
-function messageFor(elapsedMs: number): string {
+const SYMBOL_PATTERN = /^[A-Z0-9-]{0,8}$/;
+
+function normalizeInput(raw: string): string {
+  return raw.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 8);
+}
+
+function messageFor(elapsedMs: number, symbol: string): string {
   const s = elapsedMs / 1000;
-  if (s < 5) return "Detecting anomaly…";
+  if (s < 5) return `Detecting anomaly for ${symbol}…`;
   if (s < 15) return "Risk Officer reasoning…";
   if (s < 22) return "Ops Engineer dispatching tools…";
   if (s < 30) return "Synthesizer reconciling perspectives…";
@@ -24,9 +36,11 @@ export function TriggerButton({
   triggeredRunId: string | null;
 }) {
   const router = useRouter();
+  const [symbolInput, setSymbolInput] = useState("");
   const [state, setState] = useState<"idle" | "running" | "error">("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [submittedSymbol, setSubmittedSymbol] = useState<string>("AAPL");
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -45,11 +59,18 @@ export function TriggerButton({
 
   async function onClick() {
     if (state === "running" || alreadyTriggered) return;
+    const normalized = normalizeInput(symbolInput);
+    const effective = normalized.length > 0 ? normalized : "AAPL";
+    setSubmittedSymbol(effective);
     setErrorMsg(null);
     setElapsedMs(0);
     setState("running");
     try {
-      const res = await fetch("/api/scenario", { method: "POST" });
+      const res = await fetch("/api/scenario", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ symbol: effective }),
+      });
       const data = (await res.json()) as ScenarioResponse;
       if (!res.ok || !data.ok) {
         const msg = data.ok ? `HTTP ${res.status}` : data.error.message;
@@ -65,9 +86,49 @@ export function TriggerButton({
   }
 
   const disabled = alreadyTriggered || state === "running";
+  const inputDisabled = disabled;
+  const inputInvalid =
+    symbolInput.length > 0 && !SYMBOL_PATTERN.test(normalizeInput(symbolInput));
 
   return (
     <div className="space-y-3">
+      <div className="space-y-1.5">
+        <label
+          htmlFor="symbol-input"
+          className="text-label block"
+          style={{ color: "var(--color-muted)" }}
+        >
+          Symbol
+        </label>
+        <input
+          id="symbol-input"
+          type="text"
+          value={symbolInput}
+          onChange={(e) => setSymbolInput(e.target.value)}
+          placeholder="AAPL"
+          maxLength={8}
+          disabled={inputDisabled}
+          autoCapitalize="characters"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          className="w-full px-3 py-2 text-body mono border transition-opacity disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2"
+          style={{
+            backgroundColor: "var(--color-surface)",
+            color: "var(--color-ink)",
+            borderColor: inputInvalid
+              ? "var(--color-anomaly-border)"
+              : "var(--color-rule)",
+          }}
+        />
+        <p
+          className="mono text-caption"
+          style={{ color: "var(--color-muted)" }}
+        >
+          1–8 chars · letters, digits, hyphen · empty defaults to AAPL
+        </p>
+      </div>
+
       <button
         type="button"
         onClick={onClick}
@@ -80,7 +141,7 @@ export function TriggerButton({
         }}
       >
         {state === "running"
-          ? messageFor(elapsedMs)
+          ? messageFor(elapsedMs, submittedSymbol)
           : alreadyTriggered
             ? "Already triggered"
             : "Trigger live run"}

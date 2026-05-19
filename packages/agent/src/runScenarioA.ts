@@ -60,7 +60,48 @@ export type RunScenarioAArgs = {
   runbookIndex: RunbookIndex;
   gemini: { client: OpenAI; model: string };
   vultr: { client: OpenAI; model: string };
+  /**
+   * Optional ticker symbol override. When omitted or `"AAPL"`, the fixtures
+   * are passed through unchanged (matches every canonical run minted before
+   * Sprint 6 Phase 8). When set to any other symbol, the AAPL-anomalous
+   * entries in the fixture set are relabeled to the new symbol and all other
+   * entries are dropped — keeping the entire downstream chain (detector,
+   * tool dispatches, voice prompts) consistent with the user's choice
+   * without restructuring the dispatcher or tool implementations.
+   *
+   * Sanitization happens at the API-route boundary: this function trusts
+   * that any value here is already uppercase, alphanumeric+hyphen, 1-8
+   * chars. Invalid values produce undefined behavior (fixtures with no
+   * matching source entries → detectAnomalies returns []).
+   */
+  symbol?: string;
 };
+
+const ANOMALOUS_SOURCE_SYMBOL = "AAPL";
+
+/**
+ * Build a single-symbol fixture set by keeping only the entries tied to
+ * `fromSymbol` and relabeling them to `toSymbol`. Returns a fresh object;
+ * the input is not mutated.
+ */
+function relabelFixtures(
+  fixtures: ScenarioAFixtures,
+  fromSymbol: string,
+  toSymbol: string,
+): ScenarioAFixtures {
+  const sourceMd = fixtures.marketData[fromSymbol];
+  if (!sourceMd) return fixtures;
+  return {
+    marketData: { [toSymbol]: sourceMd },
+    positions: fixtures.positions
+      .filter((p) => p.symbol === fromSymbol)
+      .map((p) => ({ ...p, symbol: toSymbol })),
+    brokerPositions: fixtures.brokerPositions
+      .filter((b) => b.symbol === fromSymbol)
+      .map((b) => ({ ...b, symbol: toSymbol })),
+    anomalyEvidence: { ...fixtures.anomalyEvidence, symbol: toSymbol },
+  };
+}
 
 export type PerVoiceTiming = {
   voice: "risk_officer" | "ops_engineer" | "synthesizer";
@@ -203,6 +244,15 @@ export async function runScenarioA(
   };
   let failureTerminated = false;
 
+  // Symbol passthrough: relabel the AAPL-anomalous fixtures to the
+  // user-supplied symbol if one was provided (and is not the default).
+  // See RunScenarioAArgs.symbol for the contract.
+  const targetSymbol = args.symbol ?? ANOMALOUS_SOURCE_SYMBOL;
+  const fixtures =
+    targetSymbol !== ANOMALOUS_SOURCE_SYMBOL
+      ? relabelFixtures(args.fixtures, ANOMALOUS_SOURCE_SYMBOL, targetSymbol)
+      : args.fixtures;
+
   // -------------------------------------------------------------------------
   // 1. Pre-flight Vultr Nemotron. Hard-fail on any failure per AC-28/29.
   // -------------------------------------------------------------------------
@@ -217,7 +267,7 @@ export async function runScenarioA(
   // 2. Detect anomaly. Scenario A fixtures should always produce one.
   // -------------------------------------------------------------------------
   const detectedAt = new Date().toISOString();
-  const anomalies = detectAnomalies(args.fixtures, detectedAt);
+  const anomalies = detectAnomalies(fixtures, detectedAt);
   if (anomalies.length === 0) {
     throw new Error(
       "Scenario A fixtures produced no anomalies; runner aborts (expected the IV/RV ratio breach in fixtures.marketData.AAPL).",
@@ -254,7 +304,7 @@ export async function runScenarioA(
   // -------------------------------------------------------------------------
   const dispatchTool = createDispatcher({
     writer: args.writer,
-    fixtures: args.fixtures,
+    fixtures,
     runbookIndex: args.runbookIndex,
   });
 

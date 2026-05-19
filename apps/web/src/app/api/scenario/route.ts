@@ -78,7 +78,17 @@ function readRequiredEnv(): RequiredEnv | { missing: string[] } {
   return missing.length > 0 ? { missing } : (acc as RequiredEnv);
 }
 
-export async function POST(): Promise<Response> {
+const DEFAULT_SYMBOL = "AAPL";
+const SYMBOL_PATTERN = /^[A-Z0-9-]{1,8}$/;
+
+function sanitizeSymbol(raw: unknown): string {
+  if (typeof raw !== "string") return DEFAULT_SYMBOL;
+  const upper = raw.trim().toUpperCase();
+  if (upper.length === 0) return DEFAULT_SYMBOL;
+  return SYMBOL_PATTERN.test(upper) ? upper : DEFAULT_SYMBOL;
+}
+
+export async function POST(request: Request): Promise<Response> {
   const { sessionId } = await getOrCreateSessionId();
 
   if (hasTriggered(sessionId)) {
@@ -127,6 +137,19 @@ export async function POST(): Promise<Response> {
     );
   }
 
+  let bodyJson: unknown = null;
+  try {
+    const text = await request.text();
+    if (text.trim().length > 0) bodyJson = JSON.parse(text);
+  } catch {
+    bodyJson = null;
+  }
+  const symbol = sanitizeSymbol(
+    bodyJson !== null && typeof bodyJson === "object"
+      ? (bodyJson as Record<string, unknown>).symbol
+      : null,
+  );
+
   const runId = randomUUID();
   markTriggered(sessionId, runId);
 
@@ -172,6 +195,7 @@ export async function POST(): Promise<Response> {
       runbookIndex,
       gemini: { client: gemini, model: geminiModel },
       vultr: { client: vultr, model: vultrModel },
+      symbol,
     });
 
     return Response.json({
@@ -181,6 +205,7 @@ export async function POST(): Promise<Response> {
       decision: result.decision,
       confidenceBp: result.confidence_bp,
       totalElapsedMs: result.totalElapsedMs,
+      symbol,
     });
   } catch (err) {
     return Response.json(
