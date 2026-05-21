@@ -4,7 +4,7 @@
 > External governance layer with cryptographically verifiable audit chains.
 > Built for the AI Agent Olympics Hackathon at Milan AI Week 2026.
 
-**Live demo**: http://95-179-138-253.sslip.io
+**Status**: Submitted to Milan AI Week 2026. Live deployment retired post-judging. Codebase remains MIT-licensed and runnable locally via `pnpm install` + `pnpm --filter @roguemouse/web dev` (see [Development](#development) below).
 **License**: [MIT](LICENSE)
 
 ---
@@ -78,46 +78,48 @@ record's `previousHash`. Records are stored in Vultr Object Storage with the
 hash embedded in the S3 object key, so the storage layer's filename
 uniqueness is itself a chain-integrity check.
 
-**You can verify it in your browser without trusting our server.** Open any
-run's detail page on the live URL, click *Verify chain (15 records)*. The
-client re-canonicalizes each record, recomputes its SHA-256 (via pure-JS
-`js-sha256`, not Web Crypto — see *Honest limitations* below), and confirms
-the chain from genesis to terminal disposition. No server call, no API key,
-no trust assumption beyond *the JavaScript you can read in DevTools is doing
-what it says*.
+**The chain is verifiable without trusting any server.** The CLI verifier
+`pnpm tsx scripts/verify-chain-offline.ts <runId>` re-canonicalizes each
+record, recomputes its SHA-256, and confirms the chain from genesis to
+terminal disposition against any S3-API-compatible bucket. During the live
+deployment the same protocol ran in-browser via *Verify chain (15 records)*
+on every detail page (pure-JS `js-sha256`, not Web Crypto — see *Honest
+limitations* below). No API key, no trust assumption beyond *the code you
+can read is doing what it says*.
 
-## Try it yourself
+## What the demo showed
 
-Visit **http://95-179-138-253.sslip.io**.
+The live deployment was active through judging at Milan AI Week 2026 and has
+since been retired. While running, it exposed:
 
-What you can do:
+- **A canonical 15-record replay.** The landing page paced through a real
+  audit chain over ~33 seconds, one record at a time. The terminal
+  disposition card at the top showed the synthesizer's verdict before the
+  detail unfolded.
+- **Clean vs. degraded comparison.** Two canonical Sprint 4c runs were
+  pinned side-by-side — one with clean fixtures (the agent recommended a
+  data-freshness investigation), one with semantically uncertain inputs
+  (the agent integrated additional broker-reconciliation evidence into a
+  more detailed recommendation).
+- **Live-symbol triggers.** Visitors could supply any ticker symbol
+  (`TSLA`, `BTC-USD`, `MSFT`, …). The agent reasoned about that symbol
+  against the same synthetic IV/RV anomaly pattern, produced a fresh
+  15-record chain rooted at genesis, and wrote it to Vultr Object Storage
+  in real time. First trigger per browser session was cookie-gated; a
+  *Reset session* button cleared the gate.
+- **In-browser chain verification.** Every run detail page exposed a
+  *Verify chain (15 records)* button that re-canonicalized and re-hashed
+  every record client-side, anchoring to the fixed genesis constant.
 
-- **Watch the canonical replay.** The landing page paces through a real
-  15-record audit chain over ~33 seconds, one record at a time. The terminal
-  disposition card at the top shows the synthesizer's verdict before the
-  detail unfolds.
-- **Toggle clean vs. degraded.** Two canonical Sprint 4c runs are pinned —
-  one with clean fixtures (the agent recommends a data-freshness
-  investigation), one with semantically uncertain inputs (the agent
-  integrates the additional broker-reconciliation evidence into a more
-  detailed recommendation).
-- **Trigger your own live run.** Pick any ticker symbol (e.g., `TSLA`,
-  `BTC-USD`, `MSFT`). The agent reasons about your symbol against the same
-  synthetic IV/RV anomaly pattern, produces a fresh 15-record chain rooted
-  at genesis, and writes it to Vultr Object Storage in real time.
-  - First trigger per browser session is gated by a cookie — click *Reset
-    session* to fire another.
-- **Browse the audit log.** All runs ever minted by Roguemouse (Sprints
-  2–6 included) live under `/audit`. Click any run to see the full chain.
-- **Verify any chain.** *Verify chain* button on each detail page.
-  Cryptographic ground truth, in-browser.
+To re-mint and verify a chain yourself, see [Development](#development) below.
 
-Canonical runs pinned for replay:
+Canonical Sprint 4c runs (S3 keys and final hashes documented in
+`ROGUEMOUSE_CONTEXT.md`):
 
-- Clean: `cfbafd8c-47f9-4dbc-8c5a-dc55a6b08577` (15 records, decision
-  proposal, confidence 9000 bp, 33.3s)
-- Degraded: `381dd171-68d4-427a-af59-b4af704768b9` (15 records, decision
-  proposal, confidence 9200 bp, 30.6s)
+- Clean: `cfbafd8c-47f9-4dbc-8c5a-dc55a6b08577` — 15 records, decision
+  proposal, confidence 9000 bp, 33.3s
+- Degraded: `381dd171-68d4-427a-af59-b4af704768b9` — 15 records, decision
+  proposal, confidence 9200 bp, 30.6s
 
 ## Architecture
 
@@ -131,7 +133,7 @@ Canonical runs pinned for replay:
 | Audit storage | **Vultr Object Storage** (S3-compatible, bucket `roguemouse-audit-log`, region `ams1`) |
 | Audit chain | Application-layer SHA-256 hash chain, RFC-8785-style canonical JSON |
 | Client-side verification | `js-sha256` (pure-JS) + Web Crypto's `crypto.subtle` fallback for HTTPS contexts |
-| Deployment | **Vultr Cloud Compute** VPS (2 vCPU / 4 GB / Ubuntu 22.04, Amsterdam), Coolify-managed |
+| Deployment | **Vultr Cloud Compute** VPS (2 vCPU / 4 GB / Ubuntu 22.04, Amsterdam), Coolify-managed *(retired post-judging)* |
 | CI/CD | GitHub Actions → ghcr.io → Coolify deploy webhook (image-only push to prod, no SSH-in-CI) |
 | Validation | Zod 3 (all schemas), Vitest (327 baseline tests) |
 | Package management | pnpm 10.27 workspaces (no Turborepo) |
@@ -183,14 +185,15 @@ docs/sprints/                  per-sprint brainstorm / spec / plan / review
 These are real limitations of the demo deployment, not future-tense aspirations.
 Disclosure beats discovery.
 
-- **Production runs on HTTP, not HTTPS.** The sslip.io wildcard-DNS service
-  hit a Let's Encrypt rate limit during deployment, and the hackathon budget
-  didn't include a registered domain. The trade-off is that `window.crypto.subtle`
-  is gated to secure contexts by the W3C Web Crypto spec § 1.4, so the
-  client-side chain verifier uses `js-sha256` (a pure-JS SHA-256, MIT-licensed,
-  ~6 KB minified) instead. Hash output is byte-identical (cross-validated
-  against Node's `node:crypto` and `webcrypto.subtle` in
-  `scripts/verify-chain-offline.ts`).
+- **The live deployment ran on HTTP, not HTTPS.** The sslip.io wildcard-DNS
+  service hit a Let's Encrypt rate limit during deployment, and the hackathon
+  budget didn't include a registered domain. The trade-off was that
+  `window.crypto.subtle` is gated to secure contexts by the W3C Web Crypto
+  spec § 1.4, so the client-side chain verifier uses `js-sha256` (a pure-JS
+  SHA-256, MIT-licensed, ~6 KB minified) instead. Hash output is byte-identical
+  (cross-validated against Node's `node:crypto` and `webcrypto.subtle` in
+  `scripts/verify-chain-offline.ts`). The `js-sha256` path remains in the
+  codebase for any future re-deployment.
 
 - **Application-layer audit integrity, not WORM.** Vultr Object Storage is
   S3-API-compatible but does *not* support `ObjectLockConfiguration`. There
